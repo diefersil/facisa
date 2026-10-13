@@ -202,6 +202,7 @@ jobs:
             rsync \
               -az \
               --partial \
+              --exclude='.htaccess' \
               --timeout=600 \
               --info=progress2 \
               --stats \
