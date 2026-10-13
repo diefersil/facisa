@@ -6,6 +6,10 @@ use \Essential_Addons_Elementor\Classes\Helper;
  *
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+} // Exit if accessed directly
+
 echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' . esc_attr( get_the_ID() ) . '">
     <div class="eael-bd-cg-inner">';
 
@@ -15,7 +19,7 @@ echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' .
                 echo '<div class="eael-docs-item-count" data-content="' . esc_attr( Helper::get_doc_post_count( $term->count, $term->term_id ) ) . '"></div>';
             }
             if ( $settings['show_title'] ) {
-                $title_tag = Helper::eael_validate_html_tag( $settings['title_tag'] );
+                $title_tag = Helper::eael_validate_html_tag( $settings['title_tag'] ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                 $title = '<' . $title_tag . ' class="eael-docs-cat-title">' . $term->name . '</' . $title_tag . '>';
                 echo wp_kses( $title, Helper::eael_allowed_tags() );
             }
@@ -24,6 +28,7 @@ echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' .
 
         if ($settings['show_list'] === 'true') {
             echo '<div class="eael-bd-cg-body">';
+            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
             $args = array(
                 'post_type' => 'docs',
                 'post_status' => 'publish',
@@ -41,6 +46,7 @@ echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' .
                 ),
             );
 
+            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
             $query = new \WP_Query($args);
             if ($query->have_posts()) {
                 echo '<ul>';
@@ -59,21 +65,23 @@ echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' .
 
                 echo '</ul>';
             }
-            wp_reset_query();
+            wp_reset_postdata();
 
             // Nested category query
             if ($settings['nested_subcategory'] === 'true') {
 
+                // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                 $args = array(
                     'child_of' => $term->term_id,
                     'order' => $settings['order'],
                     'orderby' => $settings['orderby'],
                 );
-
+                //phpcs:ignore WordPress.WP.DeprecatedParameters.Get_termsParam2Found, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                 $sub_categories = get_terms('doc_category', $args);
 
                 if ($sub_categories) {
 
+                    // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                     foreach ($sub_categories as $sub_category) {
                         echo '<span class="eael-bd-grid-sub-cat-title">';
 
@@ -91,6 +99,7 @@ echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' .
 
                         echo '<a href="#">' . esc_html( $sub_category->name ) . '</a></span>';
                         echo '<ul class="docs-sub-cat-list">';
+                        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                         $sub_args = array(
                             'post_type' => 'docs',
                             'post_status' => 'publish',
@@ -105,7 +114,8 @@ echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' .
                             ),
                         );
 
-                        $sub_args['posts_per_page'] = -1;
+                        $sub_args['posts_per_page'] = -1; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+                        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                         $sub_post_query = new \WP_Query($sub_args);
                         if ($sub_post_query->have_posts()):
                             while ($sub_post_query->have_posts()): $sub_post_query->the_post();
@@ -118,7 +128,7 @@ echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' .
                                 echo '<a href="' . esc_url( get_the_permalink() ) . '">' . esc_html( get_the_title() ) . '</a></li>';
                             endwhile;
                         endif;
-                        wp_reset_query();
+                        wp_reset_postdata();
                         echo '</ul>';
                     }
                 }
@@ -132,14 +142,18 @@ echo '<article class="eael-better-docs-category-grid-post layout-2" data-id="' .
                 if ($default_multiple_kb) {
                     if(!empty($settings['selected_knowledge_base'])){
                         if(!empty($settings['selected_knowledge_base'])){
+                            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                             $button_link = str_replace('%knowledge_base%', $settings['selected_knowledge_base'], get_term_link($term->slug, 'doc_category'));
                         }else{
+                            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                             $button_link = str_replace('%knowledge_base%', 'non-knowledgebase', get_term_link($term->slug, 'doc_category'));
                         }
                     }else{
+                        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                         $button_link = str_replace('%knowledge_base%', 'non-knowledgebase', get_term_link($term->slug, 'doc_category'));
                     }
                 } else {
+                    // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
                     $button_link = get_term_link($term->slug, 'doc_category');
                 }
 

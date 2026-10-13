@@ -1,10 +1,10 @@
 === Block IPs for Gravity Forms ===
-Contributors: brightvesseldev
+Contributors: brightvesseldev, kleinmannbrightvessel
 Tags: gravity, forms, gravity forms, security
 Requires at least: 4.0
-Tested up to: 6.3
+Tested up to: 7.1
 Requires PHP: 7.2.0
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 
 Block IPs in your gravity forms
 
@@ -20,6 +20,9 @@ Using this plugin, you can now prevent specific IP addresses from submitting for
 
 
 == Changelog ==
+
+= 1.0.3 - 2026-09-10 =
+* Compatibility: Tested up to WordPress 7.1
 
 = 1.0.2 - 16 Sep 23 =
 * Updated compatibility with WordPress 6.3

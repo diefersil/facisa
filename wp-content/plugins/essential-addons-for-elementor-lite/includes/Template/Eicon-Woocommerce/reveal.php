@@ -11,9 +11,9 @@
      exit;
  } // Exit if accessed directly
  
+ // phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
  $product = wc_get_product( get_the_ID() );
  if ( ! $product ) {
-     error_log( '$product not found in ' . __FILE__ );
      return;
  }
  
@@ -55,6 +55,17 @@
      'page_id' => $settings['eael_page_id'],
  ];
  $product_wrapper_classes = implode( " ", apply_filters( 'eael_product_wrapper_class', [], $product->get_id(), 'eicon-woocommerce' ) );
+
+ // Get secondary image data for hover effect
+ $show_secondary_image = isset( $settings['eael_product_grid_show_secondary_image'] ) && 'yes' === $settings['eael_product_grid_show_secondary_image'];
+ $image_sources = [
+     'src' => '',
+     'src_hover' => ''
+ ];
+ if( $show_secondary_image ){
+     $image_sources = Helper::eael_get_woo_product_gallery_image_srcs( $product, $settings['eael_product_grid_image_size_size'] );
+ }
+ // phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
  ?>
  <li class="product <?php echo esc_attr( $product_wrapper_classes ); ?>">
 <?php
@@ -63,7 +74,7 @@ if ( $settings['eael_wc_loop_hooks'] === 'yes' ) {
     do_action( 'woocommerce_before_shop_loop_item' );
 }
 ?>
-<div class="eael-product-wrap">
+<div class="eael-product-wrap" data-src="<?php echo esc_url( $image_sources['src'] ); ?>" data-src-hover="<?php echo esc_url( $image_sources['src_hover'] ); ?>">
     <?php
 
     if( $should_print_image_clickable ) {
@@ -86,7 +97,7 @@ if ( $settings['eael_wc_loop_hooks'] === 'yes' ) {
     </div>';
 
     if ( $should_print_rating ) {
-        $avg_rating = $product->get_average_rating();
+        $avg_rating = $product->get_average_rating(); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
         if( $avg_rating > 0 ){
             // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             echo wc_get_rating_html($product->get_average_rating(), $product->get_rating_count());

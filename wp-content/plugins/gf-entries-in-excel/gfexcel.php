@@ -1,17 +1,19 @@
 <?php
 /**
- * Plugin Name:     GravityExport Lite
- * Version:         2.3.9
- * Plugin URI:      https://gfexcel.com
- * Description:     Export all Gravity Forms entries to Excel (.xlsx) or CSV via a secret shareable URL.
- * Author:          GravityKit
- * Author URI:      https://www.gravitykit.com/extensions/gravityexport/
- * License:         GPL2
- * License URI:     https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:     gk-gravityexport-lite
- * Domain Path:     /languages
+ * Plugin Name:       GravityExport Lite
+ * Version:           2.7.4
+ * Requires at least: 6.5
+ * Plugin URI:        https://gfexcel.com
+ * Description:       Export all Gravity Forms entries to Excel (.xlsx) or CSV via a secret shareable URL.
+ * Author:            GravityKit
+ * Author URI:        https://www.gravitykit.com/extensions/gravityexport/
+ * Requires PHP:      7.4.0
+ * License:           GPL2
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       gk-gravityexport-lite
+ * Domain Path:       /languages
  *
- * @package         GFExcel
+ * @package           GFExcel
  */
 
 defined( 'ABSPATH' ) or die( 'No direct access!' );
@@ -28,11 +30,16 @@ if ( ! defined( 'GFEXCEL_PLUGIN_FILE' ) ) {
 }
 
 if ( ! defined( 'GFEXCEL_PLUGIN_VERSION' ) ) {
-	define( 'GFEXCEL_PLUGIN_VERSION', '2.3.9' );
+	define( 'GFEXCEL_PLUGIN_VERSION', '2.7.4' );
 }
 
 if ( ! defined( 'GFEXCEL_MIN_PHP_VERSION' ) ) {
-	define( 'GFEXCEL_MIN_PHP_VERSION', '7.2' );
+	define( 'GFEXCEL_MIN_PHP_VERSION', '7.4' );
+}
+
+if ( ! defined( 'GFEXCEL_ATTACHMENT_NOTIFICATIONS_API_VERSION' ) ) {
+	// Capability marker: attaching the single-entry export to multiple notifications is supported.
+	define( 'GFEXCEL_ATTACHMENT_NOTIFICATIONS_API_VERSION', 1 );
 }
 
 $src_folder    = __DIR__ . '/build/vendor_prefixed/gravitykit/gravityexport-lite-src';
@@ -71,6 +78,7 @@ add_action( 'gform_loaded', static function (): void {
 	$autoload_file = __DIR__ . '/build/vendor/autoload.php';
 
 	$is_build = true;
+	$can_add_class_alias = ! defined( 'GFEXCEL_AVOID_CLASS_ALIAS' ) || ! GFEXCEL_AVOID_CLASS_ALIAS;
 	if ( ! file_exists( $autoload_file ) ) {
 		$autoload_file = __DIR__ . '/vendor/autoload.php';
 		$is_build      = false;
@@ -78,7 +86,7 @@ add_action( 'gform_loaded', static function (): void {
 
 	require_once $autoload_file;
 
-	if ( $is_build ) {
+	if ( $is_build && $can_add_class_alias ) {
 		// Make old class names available as aliases if possible.
 		$class_aliases = [
 			'PhpOffice\PhpSpreadsheet\Document\Properties',
@@ -117,6 +125,9 @@ add_action( 'gform_loaded', static function (): void {
 		// add internal service provider
 		->addServiceProvider( new BaseServiceProvider() )
 		->addServiceProvider( new AddOnProvider() );
+
+    // Dispatch event including the container.
+    do_action( 'gfexcel_container_loaded', $container );
 
 	// Instantiate add on from container.
 	$addon = $container->get( GravityExportAddon::class );

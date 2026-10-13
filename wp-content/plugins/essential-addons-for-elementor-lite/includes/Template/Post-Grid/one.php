@@ -10,6 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 } // Exit if accessed directly
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 $thumbnail_html = '';
 if ( $settings['eael_show_image'] == 'yes' ) {
 	$settings[ 'eael_image_size_customize' ] = [
@@ -46,15 +47,28 @@ if ( is_object( $authordata ) ) {
 		'<a href="%1$s" title="%2$s" rel="author">%3$s</a>',
 		esc_url( $author_url ),
 		/* translators: %s: Author's display name. */
-		esc_attr( sprintf( __( 'Posts by %s' ), $author_name ) ),
+		esc_attr( sprintf( __( 'Posts by %s', 'essential-addons-for-elementor-lite' ), $author_name ) ),
 		$author_name
 	);
 }
 $enable_ratio = $settings['enable_postgrid_image_ratio'] == 'yes' ? 'eael-image-ratio':'';
 $is_show_meta = 'yes' === $settings['eael_show_meta'];
 $title_tag    = isset($settings['title_tag']) ? Helper::eael_validate_html_tag($settings['title_tag']) : 'h2';
+$css_classes  = ' eael-post-grid-column eael-pg-post-'.get_the_ID();
+$category_list= get_the_category();
+$tags_list    = get_the_tags();
 
-echo '<article class="eael-grid-post eael-post-grid-column" data-id="' . esc_attr( get_the_ID() ) . '">
+if ( ! empty( $category_list )  ) {
+    $slugs = wp_list_pluck( $category_list, 'slug' );
+    $css_classes .= ' category-'.implode( '-', $slugs );
+}
+
+if ( ! empty( $tags_list )  ) {
+    $slugs = wp_list_pluck( $tags_list, 'slug' );
+    $css_classes .= ' tags-'.implode( '-', $slugs );
+}
+
+echo '<article class="eael-grid-post '. esc_attr( $css_classes ) .'" data-id="' . esc_attr( get_the_ID() ) . '">
         <div class="eael-grid-post-holder">
             <div class="eael-grid-post-holder-inner">';
             
@@ -69,10 +83,10 @@ echo '<article class="eael-grid-post eael-post-grid-column" data-id="' . esc_att
         echo '<div class="eael-entry-overlay ' . esc_attr( $settings['eael_post_grid_hover_animation'] ) . '">';
 
         if (isset($settings['eael_post_grid_bg_hover_icon_new']['url'])) {
-            echo '<img src="' . esc_url($settings['eael_post_grid_bg_hover_icon_new']['url']) . '" alt="' . esc_attr(get_post_meta($settings['eael_post_grid_bg_hover_icon_new']['id'], '_wp_attachment_image_alt', true)) . '" />';
+            echo '<img src="' . esc_url($settings['eael_post_grid_bg_hover_icon_new']['url']) . '" alt="' . esc_attr(Helper::get_image_alt( $settings['eael_post_grid_bg_hover_icon_new'] )) . '" />';
         } else {
             if (($settings['eael_post_grid_bg_hover_icon_new']['library']) == 'svg') {
-                echo '<img src="' . esc_url($settings['eael_post_grid_bg_hover_icon_new']['value']['url']) . '" alt="' . esc_attr(get_post_meta($settings['eael_post_grid_bg_hover_icon_new']['value']['id'], '_wp_attachment_image_alt', true)) . '" />';
+                echo '<img src="' . esc_url($settings['eael_post_grid_bg_hover_icon_new']['value']['url']) . '" alt="' . esc_attr(Helper::get_image_alt( $settings['eael_post_grid_bg_hover_icon_new']['value'] )) . '" />';
             } else {
                 echo '<i class="' . esc_attr( $settings['eael_post_grid_bg_hover_icon_new']['value'] ) . '" aria-hidden="true"></i>';
             }
@@ -92,7 +106,7 @@ echo '<article class="eael-grid-post eael-post-grid-column" data-id="' . esc_att
         if ($settings['eael_show_title']) {
             echo '<header class="eael-entry-header"><' . esc_attr( $title_tag ) . ' class="eael-entry-title">';
             // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-            echo '<a class="eael-grid-post-link" href="' . esc_url( get_the_permalink() ) . '" title="' . esc_attr( strip_tags( get_the_title() ) ) . '"' . $link_settings['title_link_nofollow'] . '' . $link_settings['title_link_target_blank'] . '>';
+            echo '<a class="eael-grid-post-link" href="' . esc_url( get_the_permalink() ) . '" title="' . esc_attr( wp_strip_all_tags( get_the_title() ) ) . '"' . $link_settings['title_link_nofollow'] . '' . $link_settings['title_link_target_blank'] . '>';
 
             if (empty($settings['eael_title_length'])) {
                 echo wp_kses( get_the_title(), Helper::eael_allowed_tags() );
@@ -173,3 +187,4 @@ echo '<article class="eael-grid-post eael-post-grid-column" data-id="' . esc_att
     echo '</div>
         </div>
     </article>';
+// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound

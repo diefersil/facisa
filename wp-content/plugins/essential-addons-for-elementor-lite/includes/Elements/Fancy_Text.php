@@ -89,7 +89,7 @@ class Fancy_Text extends Widget_Base {
 				'default'     => esc_html__( 'This is the ', 'essential-addons-for-elementor-lite'),
 				'dynamic'     => [ 'active' => true ],
 				'ai' => [
-					'active' => false,
+					'active' => true,
 				],
 			]
 		);
@@ -104,7 +104,7 @@ class Fancy_Text extends Widget_Base {
 				'label_block'	=> true,
 				'dynamic'		=> [ 'active' => true ],
 				'ai' => [
-					'active' => false,
+					'active' => true,
 				],
 			]
 		);
@@ -140,7 +140,7 @@ class Fancy_Text extends Widget_Base {
 				'default'     => esc_html__( ' of the sentence.', 'essential-addons-for-elementor-lite'),
 				'dynamic'     => [ 'active' => true ],
 				'ai' => [
-					'active' => false,
+					'active' => true,
 				],
 			]
 		);
@@ -155,7 +155,8 @@ class Fancy_Text extends Widget_Base {
   			]
 		);
 
-		$style_options = apply_filters(
+		$style_options = apply_filters( 
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 			'fancy_text_style_types',
 			[
 				'styles'	=> [
@@ -613,7 +614,9 @@ class Fancy_Text extends Widget_Base {
 		$fancy_text = array("");
 		foreach ( $settings as $item ) {
 			if ( ! empty( $item['eael_fancy_text_strings_text_field'] ) ) {
-				$fancy_text[] = HelperClass::eael_wp_kses( html_entity_decode( $item['eael_fancy_text_strings_text_field'] ) );
+				// "|" separates the phrases below, so a literal one inside a phrase is
+				// sent as its entity; the script splits first, then decodes it.
+				$fancy_text[] = str_replace( '|', '&#124;', HelperClass::eael_wp_kses( html_entity_decode( $item['eael_fancy_text_strings_text_field'] ) ) );
 			}
 		}
 

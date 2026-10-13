@@ -554,6 +554,21 @@ class Woo_Product_List extends Widget_Base
             ],
         ]);
 
+        $wc_settings_url = admin_url( 'admin.php?page=wc-settings&tab=products&section=inventory' );
+        $this->add_control(
+			'eael_product_show_stockout',
+			[
+				'label'        => esc_html__( 'Out of Stock', 'essential-addons-for-elementor-lite' ),
+				'type'         => Controls_Manager::SWITCHER,
+				'label_on'     => esc_html__( 'Show', 'essential-addons-for-elementor-lite' ),
+				'label_off'    => esc_html__( 'Hide', 'essential-addons-for-elementor-lite' ),
+				'return_value' => 'yes',
+				'default'      => 'yes',
+                /* translators: %s: WooCommerce Out of Stock visibility settings URL */
+                'description'  => sprintf( __( 'Uncheck the WooCommerce Settings <a href="%s" target="_blank">Out of stock visibility</a> option. This will not work otherwise', 'essential-addons-for-elementor-lite' ), esc_url_raw($wc_settings_url) )
+			]
+		);
+
         $this->add_control(
             'eael_product_list_products_status',
             [
@@ -561,7 +576,7 @@ class Woo_Product_List extends Widget_Base
                 'type'          => Controls_Manager::SELECT2,
                 'label_block'   => true,
                 'multiple'      => true,
-                'default'       => [ 'publish', 'pending', 'future' ],
+                'default'       => [ 'publish' ],
                 'options'       => $this->eael_get_product_statuses(),
                 'condition'     => [
                     'eael_product_list_product_filter!' => 'manual',
@@ -841,7 +856,7 @@ class Woo_Product_List extends Widget_Base
 			    'default'     => esc_html__( 'Sale', 'essential-addons-for-elementor-lite' ),
 			    'type'        => Controls_Manager::TEXT,
                 'ai' => [
-					'active' => false,
+					'active' => true,
 				],
                 'condition'     => [
                     'eael_woo_product_list_badge_show' => 'yes',
@@ -856,7 +871,7 @@ class Woo_Product_List extends Widget_Base
 			    'default'     => esc_html__( 'Stock Out', 'essential-addons-for-elementor-lite' ),
 			    'type'        => Controls_Manager::TEXT,
                 'ai' => [
-					'active' => false,
+					'active' => true,
 				],
                 'condition'     => [
                     'eael_woo_product_list_badge_show' => 'yes',
@@ -977,7 +992,7 @@ class Woo_Product_List extends Widget_Base
                     'eael_woo_product_list_excerpt_show' => 'yes',
                 ],
                 'ai' => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -1022,7 +1037,7 @@ class Woo_Product_List extends Widget_Base
                 'default'       => esc_html__('Total Sold:', 'essential-addons-for-elementor-lite'),
                 'conditions'    => $this->total_sold_conditions(),
                 'ai'            => [
-                    'active' => false,
+                    'active' => true,
                 ],
             ]
         );
@@ -1036,7 +1051,7 @@ class Woo_Product_List extends Widget_Base
                 'default'       => esc_html__('Remaining:', 'essential-addons-for-elementor-lite'),
                 'conditions'    => $this->total_sold_conditions(),
                 'ai'            => [
-                    'active' => false,
+                    'active' => true,
                 ],
             ]
         );
@@ -1077,7 +1092,7 @@ class Woo_Product_List extends Widget_Base
                     'eael_product_list_content_footer_add_to_cart_custom_text_show' => 'yes',
                 ],
                 'ai'            => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -1094,7 +1109,7 @@ class Woo_Product_List extends Widget_Base
                     'eael_product_list_content_footer_add_to_cart_custom_text_show' => 'yes',
                 ],
                 'ai' => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -1111,7 +1126,7 @@ class Woo_Product_List extends Widget_Base
                     'eael_product_list_content_footer_add_to_cart_custom_text_show' => 'yes',
                 ],
                 'ai'            => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -1128,7 +1143,7 @@ class Woo_Product_List extends Widget_Base
                     'eael_product_list_content_footer_add_to_cart_custom_text_show' => 'yes',
                 ],
                 'ai'            => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -1145,7 +1160,7 @@ class Woo_Product_List extends Widget_Base
                     'eael_product_list_content_footer_add_to_cart_custom_text_show' => 'yes',
                 ],
                 'ai'            => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -1224,7 +1239,7 @@ class Woo_Product_List extends Widget_Base
                     'eael_woo_product_list_quick_view_button_show' => 'yes',
                 ],
                 'ai'            => [
-                    'active' => false,
+                    'active' => true,
                 ],
             ]
         );
@@ -1251,7 +1266,7 @@ class Woo_Product_List extends Widget_Base
                     'eael_woo_product_list_quick_view_button_show' => 'yes',
                 ],
                 'ai'            => [
-                    'active' => false,
+                    'active' => true,
                 ],
             ]
         );
@@ -1276,7 +1291,7 @@ class Woo_Product_List extends Widget_Base
                 'show_load_more' => 'yes',
             ],
             'ai'            => [
-                'active' => false,
+                'active' => true,
             ],
         ]);
 
@@ -3925,7 +3940,7 @@ class Woo_Product_List extends Widget_Base
 	}
 
     /**
-     * Prepare product query
+     * Prepare product query using WC_Product_Query
      * @param $settings
      * @return array
      */
@@ -3933,7 +3948,7 @@ class Woo_Product_List extends Widget_Base
         $args = [
             'post_type'         => 'product',
             'order'             => ! empty( $settings['order'] )  ? sanitize_text_field( $settings['order'] ) : 'desc',
-            'post_status'       => ! empty( $settings['eael_product_list_products_status'] ) ? $settings['eael_product_list_products_status'] : [ 'publish', 'pending', 'future' ],
+            'post_status'       => ClassesHelper::eael_validate_product_statuses( ! empty( $settings['eael_product_list_products_status'] ) ? $settings['eael_product_list_products_status'] : [ 'publish' ] ),
             'posts_per_page'    => ! empty( $settings['eael_woo_product_list_products_count'] )  ? intval( $settings['eael_woo_product_list_products_count'] ) : 4,
             'offset'            => ! empty( $settings['product_offset'] )  ? intval( $settings['product_offset'] ) : 0,
             'tax_query' => [
@@ -3973,7 +3988,7 @@ class Woo_Product_List extends Widget_Base
         ];
 
         // Stock settings
-        if ( 'yes' === get_option( 'woocommerce_hide_out_of_stock_items' ) ) {
+        if ( 'yes' === get_option( 'woocommerce_hide_out_of_stock_items' ) || 'yes' !== $settings['eael_product_show_stockout'] ) {
             $args['meta_query'][] = [
                 'key' => '_stock_status',
                 'value' => 'instock'
@@ -4014,6 +4029,8 @@ class Woo_Product_List extends Widget_Base
                 break;
         }
 
+        $args = ClassesHelper::eael_multivendorx_store_query_args( $args );
+
         return $args;
     }
 
@@ -4026,11 +4043,11 @@ class Woo_Product_List extends Widget_Base
 		$woo_product_list   = $this->woo_product_list_settings  = self::get_woo_product_list_settings( $settings );
         $is_product_archive = is_product_tag() || is_product_category() || is_shop() || is_product_taxonomy();
 
-        if ( 'source_dynamic' === $settings['post_type'] && is_archive() || ! empty( $_REQUEST['post_type'] ) ) {
+        if ( 'source_dynamic' === $settings['post_type'] && is_archive() || ! empty( $_REQUEST['post_type'] ) ) { //phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		    $settings['posts_per_page'] = ! empty( $settings['eael_woo_product_list_products_count'] )  ? intval( $settings['eael_woo_product_list_products_count'] ) : 4;
 		    $settings['offset']         = ! empty( $settings['product_offset'] )  ? intval( $settings['product_offset'] ) : 0;
-		    $args                       = ClassesHelper::get_query_args( $settings );
-		    $args                       = ClassesHelper::get_dynamic_args( $settings, $args );
+		    $args                    = ClassesHelper::get_query_args( $settings );
+		    $args                    = ClassesHelper::get_dynamic_args( $settings, $args );
 	    } else {
             $args = $this->eael_prepare_product_query( $settings );
 	    }
@@ -4049,7 +4066,10 @@ class Woo_Product_List extends Widget_Base
                 }
 
                 if ( ! empty( $user_ordered_products ) && 'not-purchased' === $product_purchase_type ){
-                    $args['post__not_in'] = $user_ordered_products;
+                    $args['post__not_in'] = array_merge(
+                        $args['post__not_in'] ?? [],
+                        $user_ordered_products
+                    );
                 }
             }
         }
@@ -4079,15 +4099,16 @@ class Woo_Product_List extends Widget_Base
                             if( $settings['post_type'] === 'source_archive' && is_archive() && $is_product_archive ){
                                 global $wp_query;
                                 $query = $wp_query;
-                                $args  = $wp_query->query_vars;
+                                $found_posts = $query->found_posts;
+                                $max_page = $query->max_num_pages;
                             } else {
                                 $query = new \WP_Query( $args );
+                                $found_posts = $query->found_posts;
+                                $max_page = $query->max_num_pages;
                             }
-                            
+
                             if ( $query->have_posts() ) {
                                 // Load more data
-                                $found_posts                        = $query->found_posts - $offset;
-                                $max_page                           = ceil( $found_posts / absint( $args['posts_per_page'] ) );
                                 $args['max_page']                   = $max_page;
                                 $args['total_post']                 = $found_posts;
 
@@ -4107,8 +4128,13 @@ class Woo_Product_List extends Widget_Base
                         ?>
                     </div>
 
-                    <?php 
-                    if ( ! empty( $args['posts_per_page'] ) && $found_posts > $args['posts_per_page'] ) {
+                    <?php
+                    $limit = $args['limit'] ?? $args['posts_per_page'] ?? 4;
+                    if ( $found_posts > $limit ) {
+                        // Ensure args has posts_per_page for load more compatibility
+                        if ( ! isset( $args['posts_per_page'] ) ) {
+                            $args['posts_per_page'] = $limit;
+                        }
                         $this->print_load_more_button( $settings, $args, $dir_name );
                     }
                     ?>

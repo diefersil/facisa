@@ -3,11 +3,11 @@
  * Plugin Name: Block IPs for Gravity Forms
  * Plugin URI: https://wordpress.org/plugins/gf-block-ips/
  * Description: Prevent specific IP addresses from submitting form requests created with Gravity Forms.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Bright Plugins
  * Requires PHP: 7.2.0
  * Requires at least: 4.0
- * Tested up to: 6.3
+ * Tested up to: 7.1
  * Author URI: http://brightplugins.com/
  */
 

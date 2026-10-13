@@ -18,6 +18,7 @@ trait Core
      */
     public function i18n()
     {
+        // phpcs:ignore PluginCheck.CodeAnalysis.DiscouragedFunctions.load_plugin_textdomainFound
         load_plugin_textdomain('essential-addons-for-elementor-lite');
     }
 
@@ -45,7 +46,7 @@ trait Core
 
         // go pro
         if (!$this->pro_enabled) {
-            $links[] = sprintf('<a href="https://wpdeveloper.com/in/upgrade-essential-addons-elementor" target="_blank" style="color: #524cff; font-weight: bold;">' . __('Go Pro', 'essential-addons-for-elementor-lite') . '</a>');
+	        $links[] = sprintf('<a href="https://wpdeveloper.com/in/upgrade-essential-addons-elementor" target="_blank" style="color: #524cff; font-weight: bold;">' . __('Go Pro', 'essential-addons-for-elementor-lite') . '</a>');
         }
 
         return $links;
@@ -78,9 +79,10 @@ trait Core
     {
         if (get_transient('eael_do_activation_redirect')) {
             delete_transient('eael_do_activation_redirect');
-
+            
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             if (!isset($_GET['activate-multi'])) {
-                wp_redirect("admin.php?page=eael-settings");
+                wp_safe_redirect("admin.php?page=eael-settings");
             }
         }
     }
@@ -101,12 +103,14 @@ trait Core
         if ($this->is_plugin_installed($elementor)) {
             $activation_url = wp_nonce_url('plugins.php?action=activate&amp;plugin=' . $elementor . '&amp;plugin_status=all&amp;paged=1&amp;s', 'activate-plugin_' . $elementor);
 
+            // translators: %1$s and %2$s are the strong tags
             $message = sprintf(__('%1$sEssential Addons for Elementor%2$s requires %1$sElementor%2$s plugin to be active. Please activate Elementor to continue.', 'essential-addons-for-elementor-lite'), "<strong>", "</strong>");
 
             $button_text = __('Activate Elementor', 'essential-addons-for-elementor-lite');
         } else {
             $activation_url = wp_nonce_url(self_admin_url('update.php?action=install-plugin&plugin=elementor'), 'install-plugin_elementor');
 
+            // translators: %1$s and %2$s are the strong tags
             $message = sprintf(__('%1$sEssential Addons for Elementor%2$s requires %1$sElementor%2$s plugin to be installed and activated. Please install Elementor to continue.', 'essential-addons-for-elementor-lite'), '<strong>', '</strong>');
             $button_text = __('Install Elementor', 'essential-addons-for-elementor-lite');
         }
@@ -131,10 +135,10 @@ trait Core
         ] );
         $tracker->set_notice_options(array(
             'notice' => __( 'Want to help make <strong>Essential Addons for Elementor</strong> even more awesome? You can get a <strong>10% discount coupon</strong> for Pro upgrade if you allow.', 'essential-addons-for-elementor-lite' ),
-            'extra_notice' => __( 'We collect non-sensitive diagnostic data and plugin usage information.
-            Your site URL, WordPress & PHP version, plugins & themes and email address to send you the
-            discount coupon. This data lets us make sure this plugin always stays compatible with the most
-            popular plugins and themes. No spam, I promise.', 'essential-addons-for-elementor-lite' ),
+            'extra_notice' => __( 'Nothing is sent unless you allow it. If you do: your site URL and name;
+            WordPress, PHP and server versions; language and charset; your <strong>active</strong> plugins and theme
+            (and how many inactive); which Essential Addons elements you use; and your admin email, for the coupon.
+            We never collect your content, your visitors\' data, or your inactive plugin names. No spam, I promise.', 'essential-addons-for-elementor-lite' ),
         ));
         $tracker->init();
     }
@@ -172,6 +176,12 @@ trait Core
     public function save_global_values($post_id, $editor_data)
     {
         if (wp_doing_cron()) {
+            return;
+        }
+
+        // eael_global_settings is a site-wide option; only users who can manage
+        // options may mutate it. Prevents Contributor+ stored XSS (CVE-2026-15156).
+        if (!current_user_can('manage_options')) {
             return;
         }
 
@@ -289,6 +299,8 @@ trait Core
 
         //Scroll to Top global settings : updated on elementor/editor/after_save action
         $global_settings['eael_ext_scroll_to_top'] = $this->get_ext_scroll_to_top_global_settings($post_id, $document, $global_settings);
+
+        $global_settings = apply_filters('eael/extentions/global_settings', $global_settings, $document, $post_id);
         
         // set editor time
         update_option('eael_editor_updated_at', strtotime('now'));

@@ -1,0 +1,233 @@
+<?php
+
+namespace GFExcel\Routing;
+
+use GFExcel\Addon\GravityExportAddon;
+
+/**
+ * Represents a WordPress router for GravityExport Lite.
+ * @since 2.4.0
+ */
+final class WordPressRouter implements Router {
+	/**
+	 * The slug used in the generated URL.
+	 *
+	 * @since 2.4.0
+	 *
+	 * @var string
+	 */
+	public const DEFAULT_ACTION = 'gravityexport-lite';
+
+	/**
+	 * The add-on slugs whose feeds can hold a download hash.
+	 *
+	 * The feed table is shared with every other Gravity Forms add-on, so the lookup has to say which feeds
+	 * are ours. Feeds saved before 2.0 carry the add-on's former slug and still serve downloads, so both
+	 * are accepted.
+	 *
+	 * @since 2.7.3
+	 *
+	 * @var string[]
+	 */
+	private const FEED_SLUGS = [ 'gravityexport-lite', 'gf-entries-in-excel' ];
+
+	/**
+	 * Instantiates the router.
+	 *
+	 * @since 2.4.0
+	 */
+	public function __construct() {
+		add_filter( 'query_vars', [ $this, 'update_query_vars' ] );
+	}
+
+	/**
+	 * @inheritDoc
+	 * @since 2.4.0
+	 */
+	public function init(): void {
+		$this->register_endpoints( $this->endpoints() );
+	}
+
+	/**
+	 * @inheritDoc
+	 * @since 2.4.0
+	 */
+	public function matches( Request $request ): bool {
+		return in_array( $request->action(), $this->endpoints(), true );
+	}
+
+
+	/**
+	 * Registers the permalink structures for the download
+	 *
+	 * @since 1.0.0
+	 */
+	public function register_endpoints( array $endpoints ): void {
+		$rewrite_rules = get_option( 'rewrite_rules' );
+		$flush_rules   = false;
+
+		foreach ( $endpoints as $endpoint ) {
+			$endpoint_regex = '^' . $endpoint . '/(.+)/?$';
+
+			add_rewrite_rule(
+				$endpoint_regex,
+				'index.php?' . Router::KEY_ACTION . '=' . $endpoint . '&' . Router::KEY_HASH . '=$matches[1]',
+				'top'
+			);
+
+			if ( ! isset( $rewrite_rules[ $endpoint_regex ] ) ) {
+				$flush_rules = true;
+			}
+		}
+
+		if ( $flush_rules ) {
+			flush_rewrite_rules();
+		}
+	}
+
+	/**
+	 * @inheritDoc
+	 * @since 2.4.0
+	 */
+	public function get_url_for_form( int $form_id ): ?string {
+		$hash = $this->get_hash_for_form( $form_id );
+
+		if ( ! $hash ) {
+			return null;
+		}
+
+		return $this->get_url_for_hash( $hash );
+	}
+
+	/**
+	 * Helper method to retrieve feed data using unique URL hash value.
+	 *
+	 * @since 1.9
+	 *
+	 * @return array|null Feed data.
+	 */
+	public function get_feed_by_request( Request $request ): ?array {
+		global $wpdb;
+
+		$hash = $request->hash();
+
+		// An empty hash matches every active feed via the LIKE below, and equals the stored value of a feed
+		// whose hash was cleared or never set, so it must never reach the lookup.
+		if ( '' === $hash ) {
+			return null;
+		}
+
+		$slugs = implode( ', ', array_fill( 0, count( self::FEED_SLUGS ), '%s' ) );
+
+		// The LIKE is only a prefilter; every candidate is checked against its stored hash below.
+		$feeds = $wpdb->get_results( $wpdb->prepare(
+			"SELECT * FROM %i WHERE is_active=1 AND addon_slug IN ( $slugs ) AND meta LIKE %s ORDER BY `feed_order`, `id`",
+			array_merge( [ $wpdb->prefix . 'gf_addon_feed' ], self::FEED_SLUGS, [ '%' . $wpdb->esc_like( $hash ) . '%' ] )
+		), ARRAY_A );
+
+		foreach ( (array) $feeds as $feed ) {
+			$meta = json_decode( (string) rgar( $feed, 'meta' ), true );
+
+			if ( ! is_array( $meta ) ) {
+				continue;
+			}
+
+			$stored_hash = rgar( $meta, 'hash' );
+
+			if ( ! is_string( $stored_hash ) || '' === $stored_hash ) {
+				continue;
+			}
+
+			if ( hash_equals( $stored_hash, $hash ) ) {
+				$feed['meta'] = $meta;
+
+				return $feed;
+			}
+		}
+
+		/**
+		 * Claims a download hash none of this add-on's own feeds own.
+		 *
+		 * An add-on that stores its own download hash, such as GravityExport's export filters, keeps it in
+		 * a feed carrying that add-on's slug, which the query above excludes.
+		 *
+		 * @since 1.9
+		 *
+		 * @param array|null $feed The feed, or null when this add-on owns no feed with this hash.
+		 * @param string     $hash The download hash taken from the request.
+		 */
+		return apply_filters( 'gfexcel_hash_feed', null, $hash );
+	}
+
+
+	/**
+	 * Returns the download hash for a form.
+	 *
+	 * @since 2.4.0
+	 *
+	 * @param int $form_id the form id to get the hash for.
+	 *
+	 * @return string|null the hash
+	 */
+	public function get_hash_for_form( int $form_id ): ?string {
+		if ( ! \GFAPI::form_id_exists( $form_id ) ) {
+			return null;
+		}
+
+		$addon = GravityExportAddon::get_instance();
+		if ( $hash = $addon->get_feed_meta_field( 'hash', $form_id ) ) {
+			return $hash;
+		}
+
+		$meta = \GFFormsModel::get_form_meta( $form_id );
+		if ( ! isset( $meta[ self::KEY_HASH ] ) || empty( $meta[ self::KEY_HASH ] ) ) {
+			return null;
+		}
+
+		return $meta[ self::KEY_HASH ];
+	}
+
+	/**
+	 * @inheritDoc
+	 * @since 2.4.0
+	 */
+	public function endpoints(): array {
+		return [
+			'gf-entries-in-excel',
+			'gravityexport-lite',
+			'gravityexport',
+		];
+	}
+
+	/**
+	 * Adds the query vars for the permalink.
+	 * @since 1.0.0
+	 *
+	 * @param string[] $vars The original query vars.
+	 *
+	 * @return string[] The new query vars.
+	 */
+	public function update_query_vars( array $vars ): array {
+		return array_merge( $vars, [
+			Router::KEY_ACTION,
+			Router::KEY_HASH,
+		] );
+	}
+
+	/**
+	 * @inheritDoc
+	 * @since 2.4.0
+	 */
+	public function get_url_for_hash( string $hash ): string {
+		$blogurl   = get_bloginfo( 'url' );
+		$permalink = '/index.php?' . self::KEY_ACTION . '=%s&' . self::KEY_HASH . '=%s';
+
+		if ( get_option( 'permalink_structure' ) ) {
+			$permalink = '/%s/%s';
+		} else {
+			$hash = urlencode( $hash );
+		}
+
+		return $blogurl . sprintf( $permalink, self::DEFAULT_ACTION, $hash );
+	}
+}

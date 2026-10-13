@@ -10,7 +10,11 @@ namespace GFExcel\Addon;
 use GFCommon;
 use GFExcel\Action\ActionAware;
 use GFExcel\Action\ActionAwareInterface;
+use GFExcel\Action\ActionNotice;
+use GFExcel\Action\DownloadUrlDisableAction;
+use GFExcel\Action\DownloadUrlEnableAction;
 use GFExcel\Action\DownloadUrlResetAction;
+use GFExcel\Action\NotifyingActionInterface;
 use GFExcel\Component\Usage;
 use GFExcel\Field\ProductField;
 use GFExcel\Field\SeparableField;
@@ -23,8 +27,9 @@ use GFExcel\GravityForms\Field\SortFields;
 use GFExcel\Renderer\AbstractPHPExcelRenderer;
 use GFExcel\Renderer\PHPExcelMultisheetRenderer;
 use GFExcel\Repository\FieldsRepository;
-use GFExcel\Repository\FormRepositoryInterface;
+use GFExcel\Routing\Router;
 use Gravity_Forms\Gravity_Forms\Settings\Fields;
+use Gravity_Forms\Gravity_Forms\Settings\Settings;
 
 /**
  * GravityExport Lite add-on.
@@ -84,6 +89,18 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	protected $_capabilities_form_settings = 'gravityforms_export_entries';
 
 	/**
+	 * @since 2.7.1
+	 * @var string Global settings permissions.
+	 */
+	protected $_capabilities_settings_page = 'gravityforms_export_entries';
+
+	/**
+	 * @since 2.7.1
+	 * @var string Uninstall permissions.
+	 */
+	protected $_capabilities_uninstall = 'gravityforms_uninstall';
+
+	/**
 	 * @since 2.0.0
 	 * @var string Relative path to file from plugins directory.
 	 */
@@ -103,11 +120,13 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	private $feed = [];
 
 	/**
-	 * The form repository.
-	 * @since 2.0.0
-	 * @var FormRepositoryInterface
+	 * The router.
+	 *
+	 * @since 2.4.0
+	 *
+	 * @var Router
 	 */
-	private $form_repository;
+	private $router;
 
 	/**
 	 * The usage component.
@@ -142,7 +161,7 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	 * @inheritdoc
 	 * @since 2.0.0
 	 */
-	public function __construct( FormRepositoryInterface $form_repository ) {
+	public function __construct( Router $router ) {
 		parent::__construct();
 
 		$title = defined( 'GK_GRAVITYEXPORT_PLUGIN_VERSION' ) ? 'GravityExport' : 'GravityExport Lite';
@@ -150,7 +169,7 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 		$this->_title       = $title;
 		$this->_short_title = $title;
 
-		$this->form_repository = $form_repository;
+		$this->router          = $router;
 		$this->component_usage = new Usage();
 	}
 
@@ -166,6 +185,98 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 		add_filter( 'gform_form_actions', \Closure::fromCallable( [ $this, 'gform_form_actions' ] ), 10, 2 );
 		add_action( 'wp_before_admin_bar_render', \Closure::fromCallable( [ $this, 'admin_bar' ] ), 20 );
 		add_filter( 'gform_export_fields', \Closure::fromCallable( [ $this, 'gform_export_fields' ] ) );
+		add_action( 'admin_notices', \Closure::fromCallable( [ $this, 'queue_download_url_error_notice' ] ) );
+
+		// Strip a one-time success/error token from the address bar after first paint so a browser
+		// refresh (a GET of the same URL) cannot re-surface the message. Keeps the flow storage-free;
+		// if JS is off it degrades to re-showing the message on refresh, which never re-runs the action.
+		if ( rgget( 'gexcel_notice' ) || rgget( 'gexcel_error' ) ) {
+			add_action( 'admin_print_footer_scripts', [ self::class, 'clean_notice_query_arg' ] );
+		}
+	}
+
+	/**
+	 * Queues a download-URL action's failure, carried across its redirect by an allowlisted
+	 * `gexcel_error` token (see self::save_feed_settings()).
+	 *
+	 * Uses Gravity Forms' own error queue rather than the Settings postback box (which can only paint
+	 * success styling on a GET) or a raw admin notice (GF renders its pages in a custom layout where
+	 * admin_notices output lands in the document head). The specific cause is logged, not shown, so
+	 * internals do not leak to the browser.
+	 *
+	 * @since 2.7.0
+	 *
+	 * @return void
+	 */
+	public function queue_download_url_error_notice(): void {
+		if ( ! $this->is_download_url_notice( sanitize_key( (string) rgget( 'gexcel_error' ) ) ) ) {
+			return;
+		}
+
+		GFCommon::add_error_message( esc_html__( 'There was an error generating the download URL. Please try again.', 'gk-gravityexport-lite' ) );
+	}
+
+	/**
+	 * @inheritDoc
+	 *
+	 * Re-surfaces a successful download-URL action's confirmation after its PRG redirect via the
+	 * Settings framework's postback message. The action name rides an allowlisted `gexcel_notice`
+	 * token on the redirect (see self::save_feed_settings()), so nothing is stored to survive it.
+	 *
+	 * @since 2.7.0
+	 */
+	public function feed_settings_init(): void {
+		parent::feed_settings_init();
+
+		$message = $this->get_download_url_notice_message( sanitize_key( (string) rgget( 'gexcel_notice' ) ) );
+		if ( '' === $message ) {
+			return;
+		}
+
+		// GFAddOn::get_settings_renderer() documents the wrong class name, so the type is restated here.
+		/** @var Settings|false $renderer */
+		$renderer = $this->get_settings_renderer();
+		if ( ! $renderer ) {
+			return;
+		}
+
+		// Only reached with a valid token, so replacing GF's own postback callback (which handles the
+		// new-feed fid=0 redirect) is safe: that flow never carries a gexcel_notice token.
+		$renderer->set_postback_message_callback( static function ( $default ) use ( $message ) {
+			// Only surface our notice on the post-redirect GET. On a save (POST) pass GF's own
+			// success/validation message through untouched, as GFFeedAddOn's own callback does.
+			if ( ! empty( $_POST ) ) {
+				return $default;
+			}
+
+			return $message ?: $default;
+		} );
+	}
+
+	/**
+	 * Prints a one-liner that removes the one-time `gexcel_notice`/`gexcel_error` tokens from the
+	 * current URL, so a browser refresh does not re-surface the message.
+	 *
+	 * @since 2.7.0
+	 *
+	 * @return void
+	 */
+	public static function clean_notice_query_arg(): void {
+		?>
+		<script>
+			( function () {
+				const url = new URL( window.location.href );
+
+				if ( ! url.searchParams.has( 'gexcel_notice' ) && ! url.searchParams.has( 'gexcel_error' ) ) {
+					return;
+				}
+
+				url.searchParams.delete( 'gexcel_notice' );
+				url.searchParams.delete( 'gexcel_error' );
+				window.history.replaceState( {}, '', url.toString() );
+			} )();
+		</script>
+		<?php
 	}
 
 	/**
@@ -189,8 +300,9 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 				'title'  => __( 'Activate GravityExport', 'gk-gravityexport-lite' ),
 				'fields' => [
 					[
-						'name' => 'hash',
-						'type' => 'download_url',
+						'name'       => 'hash',
+						'type'       => 'download_url',
+						'assets_dir' => $this->assets_dir,
 					],
 				],
 			];
@@ -214,16 +326,19 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 			];
 		}
 
+		$hash = $this->get_setting( 'hash' );
 		$settings_sections[] = [
 			'id'          => 'gk-gravityexport-download',
 			'title'       => __( 'Download settings', 'gk-gravityexport-lite' ),
 			'collapsible' => true,
 			'fields'      => [
 				[
-					'label'      => esc_html__( 'Download URL', 'gk-gravityexport-lite' ),
-					'name'       => 'hash',
-					'type'       => 'download_url',
-					'assets_dir' => $this->assets_dir,
+					'label'         => esc_html__( 'Download URL', 'gk-gravityexport-lite' ),
+					'name'          => 'hash',
+					'type'          => 'download_url',
+					'assets_dir'    => $this->assets_dir,
+					'default_value' => $hash,
+					'url'           => $this->router->get_url_for_hash( $hash ),
 				],
 				[
 					'label'      => esc_html__( 'Embed shortcode', 'gk-gravityexport-lite' ),
@@ -276,15 +391,16 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 			'id'     => 'gk-gravityexport-download-file',
 			'class'  => 'gk-gravityexport-download-file',
 			'title'  => __( 'Instant Download ⚡️', 'gk-gravityexport-lite' ),
-			'fields' => [
-				[
-					'name'    => 'download_file',
-					'label'   => esc_html__( 'Select Date Range (optional)', 'gk-gravityexport-lite' ),
-					'tooltip' => 'export_date_range',
-					'type'    => 'download_file',
-					'url'     => $this->form_repository->getDownloadUrl( $this->get_current_settings() ),
-				]
-			],
+            'fields' => [
+                [
+                    'name'          => 'download_file',
+                    'label'         => esc_html__( 'Select Date Range (optional)', 'gk-gravityexport-lite' ),
+                    'tooltip'       => 'export_date_range',
+                    'type'          => 'download_file',
+                    'default_value' => $hash,
+                    'url'           => $this->router->get_url_for_hash( $hash ),
+                ],
+            ],
 		];
 
 		$settings_sections[] = [
@@ -338,7 +454,7 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 			],
 		];
 
-		$settings_sections = array_merge( $settings_sections, apply_filters(
+		$general_settings = apply_filters(
 			'gfexcel_general_settings',
 			[
 				[
@@ -415,7 +531,12 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 					],
 				],
 			]
-		) );
+		);
+
+		// A filter callback can return anything; only merge usable sections.
+		if ( is_array( $general_settings ) ) {
+			$settings_sections = array_merge( $settings_sections, $general_settings );
+		}
 
 		$settings_sections[] = [
 			'id'          => 'gk-section-fields',
@@ -751,10 +872,14 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	 * @since 2.0.0
 	 */
 	public function styles(): array {
+		$css_file    = plugin_dir_path( GFEXCEL_PLUGIN_FILE ) . 'public/css/gravityexport-lite.css';
+		$css_version = file_exists( $css_file ) ? (string) filemtime( $css_file ) : $this->get_version();
+
 		return array_merge( parent::styles(), [
 			[
 				'handle'  => 'gravityexport_lite',
 				'src'     => $this->assets_dir . 'css/gravityexport-lite.css',
+				'version' => $css_version,
 				'enqueue' => [
 					[ 'admin_page' => 'form_settings', 'tab' => $this->get_slug() ],
 					[ 'admin_page' => 'plugin_settings', 'tab' => $this->get_slug() ],
@@ -768,6 +893,9 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	 * @since 2.0.0
 	 */
 	public function scripts(): array {
+		$js_file    = plugin_dir_path( GFEXCEL_PLUGIN_FILE ) . 'public/js/gravityexport-lite.js';
+		$js_version = file_exists( $js_file ) ? (string) filemtime( $js_file ) : $this->get_version();
+
 		return array_merge( parent::scripts(), [
 			[
 				'handle'  => 'jquery-ui-sortable',
@@ -779,19 +907,17 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 				],
 			],
 			[
-				'handle'  => 'gravityexport_lite',
-				'src'     => $this->assets_dir . 'js/gravityexport-lite.js',
-				'strings' => [
-					'enable'  => esc_html__( 'Enable all', 'gk-gravityexport-lite' ),
-					'disable' => esc_html__( 'Disable all', 'gk-gravityexport-lite' ),
-				],
-				'enqueue' => [
+				'handle'   => 'gravityexport_lite',
+				'src'      => $this->assets_dir . 'js/gravityexport-lite.js',
+				'version'  => $js_version,
+				'enqueue'  => [
 					[
 						'admin_page' => 'form_settings',
 						'tab'        => $this->get_slug(),
 					],
 				],
-				'deps'    => [ 'jquery', 'jquery-ui-sortable', 'jquery-ui-datepicker' ],
+				'deps'     => [ 'jquery', 'jquery-ui-sortable', 'jquery-ui-datepicker', 'underscore', 'wp-i18n', 'wp-a11y' ],
+				'callback' => [ $this, 'localize_sortable_script' ],
 			],
 			[
 				'handle'  => 'gravityexport_lite_settings',
@@ -808,6 +934,32 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	}
 
 	/**
+	 * Localize the sortable script with i18n strings.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @return void
+	 */
+	public function localize_sortable_script(): void {
+		wp_localize_script( 'gravityexport_lite', 'gravityexport_lite_strings', [
+			'enable'              => esc_html__( 'Enable all', 'gk-gravityexport-lite' ),
+			'disable'             => esc_html__( 'Disable all', 'gk-gravityexport-lite' ),
+			'enable_visible'      => esc_html__( 'Enable visible', 'gk-gravityexport-lite' ),
+			'disable_visible'     => esc_html__( 'Disable visible', 'gk-gravityexport-lite' ),
+			'no_fields_match'     => esc_html__( 'No fields match your search.', 'gk-gravityexport-lite' ),
+			'one_field_matches'   => esc_html__( '1 field matches your search.', 'gk-gravityexport-lite' ),
+			/* translators: [count] is replaced with the number of matching fields. Do not translate text inside square brackets. */
+			'n_fields_match'      => esc_html__( '[count] fields match your search.', 'gk-gravityexport-lite' ),
+			/* translators: [field] is the field name, [destination] is the list name (e.g., "Enabled Fields"). Do not translate text inside square brackets. */
+			'field_moved'         => esc_html__( '[field] moved to [destination].', 'gk-gravityexport-lite' ),
+			/* translators: [count] is the number of fields, [destination] is the list name (e.g., "Enabled Fields"). Do not translate text inside square brackets. */
+			'fields_moved'        => esc_html__( '[count] fields moved to [destination].', 'gk-gravityexport-lite' ),
+			/* translators: [destination] is the list name (e.g., "Enabled Fields"). Do not translate text inside square brackets. */
+			'one_field_moved'     => esc_html__( '1 field moved to [destination].', 'gk-gravityexport-lite' ),
+		] );
+	}
+
+	/**
 	 * @inheritdoc
 	 * @since 2.0.0
 	 */
@@ -817,13 +969,56 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 		// Keep old settings that were not provided (used for download_count).
 		$settings = array_merge( $this->get_previous_settings(), $settings );
 
+		/**
+		 * Modifies the feed settings before they are stored.
+		 *
+		 * Runs inside the save, so related settings are written in a single update.
+		 *
+		 * @since 2.7.0
+		 *
+		 * @param array|mixed $settings The settings about to be stored.
+		 * @param int|string  $feed_id  The feed ID.
+		 * @param int|string  $form_id  The form ID.
+		 */
+		$filtered = apply_filters( 'gk/gravityexport/feed/pre-save-settings', $settings, $feed_id, $form_id );
+
+		if ( is_array( $filtered ) ) {
+			$settings = $filtered;
+		}
+
 		if ( $this->hasAction( $action ) ) {
 			// Prevent indefinite loop in case action's fire() method calls save_feed_settings().
 			unset( $_POST['gform-settings-save'] );
 
-			$this->getAction( $action )->fire( $this, [ $feed_id, $form_id, $settings ] );
+			$action_object = $this->getAction( $action );
 
-			self::refresh();
+			if ( $action_object instanceof NotifyingActionInterface ) {
+				$notice = $action_object->fire_with_notice( $this, [ $feed_id, $form_id, $settings ] );
+
+				if ( $notice && ActionNotice::ERROR === $notice->type() ) {
+					// The action failed and changed nothing. Log the specific cause and carry an
+					// error token so the redirect target paints a red notice; GF's postback box can
+					// only render success styling on a GET, so the error cannot ride that channel.
+					$this->log_error( __METHOD__ . '(): ' . $notice->message() );
+
+					self::refresh( self::feed_settings_url( null, $action ) );
+
+					return $feed_id;
+				}
+
+				// PRG so a browser refresh cannot re-run a successful destructive action. Carry the
+				// allowlisted action token only on success, so feed_settings_init() never confirms
+				// something that did not happen. Nothing is stored to survive the redirect.
+				$token = $notice && ActionNotice::SUCCESS === $notice->type() ? $action : null;
+
+				self::refresh( self::feed_settings_url( $token ) );
+
+				return $feed_id;
+			}
+
+			$action_object->fire( $this, [ $feed_id, $form_id, $settings ] );
+
+			self::refresh( self::feed_settings_url() );
 
 			return $feed_id;
 		}
@@ -832,20 +1027,83 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	}
 
 	/**
-	 * Helper method to refresh the page, to an optional url.
+	 * Redirects (PRG) to the current feed settings page, or to an explicit URL.
+	 *
 	 * @since 2.0.0
 	 */
 	protected static function refresh( ?string $url = null ): void {
-		if ( $url === null ) {
-			$url = add_query_arg( [
-				'page'    => rgget( 'page' ),
-				'view'    => rgget( 'view' ),
-				'subview' => rgget( 'subview' ),
-				'id'      => rgget( 'id' ),
-			], get_admin_url() );
+		wp_safe_redirect( $url ?? self::feed_settings_url() );
+		exit;
+	}
+
+	/**
+	 * Builds the current feed-settings URL, optionally carrying a one-time success or error token.
+	 *
+	 * @since 2.7.0
+	 *
+	 * @param string|null $notice Allowlisted success token to confirm after the redirect.
+	 * @param string|null $error  Allowlisted error token to surface a failure after the redirect.
+	 *
+	 * @return string
+	 */
+	protected static function feed_settings_url( ?string $notice = null, ?string $error = null ): string {
+		$args = [
+			'page'    => rgget( 'page' ),
+			'view'    => rgget( 'view' ),
+			'subview' => rgget( 'subview' ),
+			'id'      => rgget( 'id' ),
+		];
+
+		if ( $fid = rgget( 'fid' ) ) {
+			$args['fid'] = $fid;
 		}
 
-		wp_safe_redirect( $url );
+		if ( $notice ) {
+			$args['gexcel_notice'] = $notice;
+		}
+
+		if ( $error ) {
+			$args['gexcel_error'] = $error;
+		}
+
+		return add_query_arg( $args, get_admin_url() );
+	}
+
+	/**
+	 * Whether the token identifies a download-URL action whose success message may be shown after a redirect.
+	 *
+	 * @since 2.7.0
+	 *
+	 * @param string $notice The notice token.
+	 *
+	 * @return bool
+	 */
+	private function is_download_url_notice( string $notice ): bool {
+		return in_array( $notice, [
+			DownloadUrlResetAction::$name,
+			DownloadUrlEnableAction::$name,
+			DownloadUrlDisableAction::$name,
+		], true );
+	}
+
+	/**
+	 * Returns the translated success message for an allowlisted download-URL notice token, sourced
+	 * from the action itself so the string has a single source of truth.
+	 *
+	 * @since 2.7.0
+	 *
+	 * @param string $notice The notice token.
+	 *
+	 * @return string
+	 */
+	private function get_download_url_notice_message( string $notice ): string {
+		if ( ! $this->is_download_url_notice( $notice ) || ! $this->hasAction( $notice ) ) {
+			return '';
+		}
+
+		$action = $this->getAction( $notice );
+
+		return $action instanceof NotifyingActionInterface ? $action->get_success_notice()->message() : '';
 	}
 
 	/**
@@ -995,7 +1253,9 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	 * @return array The new form actions.
 	 */
 	private function gform_form_actions( array $form_actions, string $form_id ): array {
-		if ( $url = GFExcel::url( (int) $form_id ) ) {
+		$url = $this->router->get_url_for_form( (int) $form_id );
+
+		if ( $url ) {
 
 			$form_actions['download'] = [
 				'label'      => __( 'Download', 'gk-gravityexport-lite' ),
@@ -1012,7 +1272,7 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 	 * Adds the export links to the admin bar.
 	 * @since 1.7.0
 	 */
-	private static function admin_bar(): void {
+	private function admin_bar(): void {
 		// Only show links if the user has the rights for exporting.
 		if ( ! \GFCommon::current_user_can_any( 'gravityforms_export_entries' ) ) {
 			return;
@@ -1034,7 +1294,8 @@ final class GravityExportAddon extends \GFFeedAddOn implements AddonInterface, A
 
 		// add download URL to every form that has a hash.
 		foreach ( $form_ids as $id ) {
-			if ( $url = GFExcel::url( $id ) ) {
+			$url = $this->router->get_url_for_form( $id );
+			if ( $url ) {
 				$wp_admin_bar->add_node( [
 					'id'     => 'gfexcel-form-' . $id . '-download',
 					'parent' => 'gform-form-' . $id,

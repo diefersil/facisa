@@ -7,6 +7,9 @@ if ( !defined( 'ABSPATH' ) ) {
 } // Exit if accessed directly
 
 use Elementor\Plugin;
+use \Elementor\Controls_Manager;
+use \Elementor\Group_Control_Border;
+use \Elementor\Group_Control_Box_Shadow;
 use \Essential_Addons_Elementor\Classes\Helper as HelperClass;
 
 trait Helper
@@ -36,10 +39,22 @@ trait Helper
      * @since  4.0.2
      */
     public function typeform_auth_handle() {
-	    if ( isset($_GET[ 'page' ]) && 'eael-settings' == $_GET[ 'page' ] ) {
-		    if ( isset( $_GET[ 'typeform_tk' ] ) && isset( $_GET[ 'pr_code' ] ) ) {
-			    if ( wp_hash( 'eael_typeform' ) === $_GET[ 'pr_code' ] ) {
-				    update_option( 'eael_save_typeform_personal_token', sanitize_text_field( $_GET[ 'typeform_tk' ] ), false );
+	    // admin_init also fires on admin-ajax.php, where it runs for logged-out
+	    // visitors and skips the menu page's capability check. The OAuth provider
+	    // only ever redirects back to admin.php, so refuse AJAX requests outright,
+	    // and require the capability that manages the plugin's settings.
+	    if ( wp_doing_ajax() || ! current_user_can( 'manage_options' ) ) {
+		    return;
+	    }
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	    if ( !empty($_GET[ 'page' ]) && 'eael-settings' === sanitize_text_field( wp_unslash( $_GET[ 'page' ] ) ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		    if ( !empty( $_GET[ 'typeform_tk' ] ) && !empty( $_GET[ 'pr_code' ] ) ) {
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			    if ( wp_hash( 'eael_typeform' ) === sanitize_text_field( wp_unslash( $_GET[ 'pr_code' ] ) ) ) {
+					// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				    update_option( 'eael_save_typeform_personal_token', sanitize_text_field( wp_unslash( $_GET[ 'typeform_tk' ] ) ), false );
 			    }
 		    }
 	    }
@@ -152,7 +167,7 @@ trait Helper
 	    $max_page = empty( $args['max_page'] ) ? false : $args['max_page'];
 	    unset( $args['max_page'] );
 
-        if ( isset( $args['found_posts'] ) && $args['found_posts'] <= $args['posts_per_page'] ){
+        if ( isset( $args['found_posts'], $args['posts_per_page'] ) && $args['found_posts'] <= $args['posts_per_page'] ){
 	        $this->add_render_attribute( 'load-more', [ 'class' => 'hide-load-more' ] );
 	        unset( $args['found_posts'] );
         }
@@ -179,7 +194,7 @@ trait Helper
 		    $this->add_render_attribute( 'load-more', [ 'data-max-page' => $max_page ] );
 	    }
 
-        if ( $args['posts_per_page'] != '-1' ) {
+        if ( isset( $args['posts_per_page'] ) && $args['posts_per_page'] != '-1' ) {
             $this->add_render_attribute( 'load-more-wrap', 'class', 'eael-load-more-button-wrap' );
         
             if ( "eael-dynamic-filterable-gallery" == $this->get_name() ){
@@ -263,7 +278,8 @@ trait Helper
 			return;
 		}
 
-		if ( isset( $_GET['empty_cart'] ) && 'yes' === esc_html( $_GET['empty_cart'] ) ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( !empty( $_GET['empty_cart'] ) && 'yes' === sanitize_text_field( wp_unslash( $_GET['empty_cart'] ) ) ) {
 			WC()->cart->empty_cart();
 		}
 	}
@@ -311,13 +327,21 @@ trait Helper
 	 * Update Checkout Cart Quantity via ajax call.
 	 */
 	public function eael_checkout_cart_qty_update() {
-        if ( ! wp_verify_nonce( $_POST['nonce'], 'essential-addons-elementor' ) ) {
-            die( esc_html__( 'Permission Denied!', 'essential-addons-elementor' ) );
+        if ( empty( $_POST['nonce'] ) || ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'essential-addons-elementor' ) ) ) {
+            die( esc_html__( 'Permission Denied!', 'essential-addons-for-elementor-lite' ) );
         }
 
-        $cart_item_key = $_POST['cart_item_key'];
+        $cart_item_key = !empty( $_POST['cart_item_key'] ) ? sanitize_text_field( wp_unslash( $_POST['cart_item_key'] ) ) : '';
 		$cart_item = WC()->cart->get_cart_item( $cart_item_key );
-		$cart_item_quantity = apply_filters( 'woocommerce_stock_amount_cart_item', apply_filters( 'woocommerce_stock_amount', preg_replace( "/[^0-9\.]/", '', filter_var($_POST['quantity'], FILTER_SANITIZE_NUMBER_INT)) ), $cart_item_key );
+		$cart_item_quantity = !empty( $_POST['quantity']) ? absint( wp_unslash( $_POST['quantity'] ) ) :0;
+		$cart_item_quantity = apply_filters( 'woocommerce_stock_amount_cart_item', 
+		apply_filters( 'woocommerce_stock_amount', 
+		preg_replace( 
+			"/[^0-9\.]/", 
+			'', 
+			filter_var($cart_item_quantity, FILTER_SANITIZE_NUMBER_INT)
+			) 
+		), $cart_item_key );
 
 		$passed_validation  = apply_filters( 'woocommerce_update_cart_validation', true, $cart_item_key, $cart_item, $cart_item_quantity );
 		if ( $passed_validation ) {
@@ -379,10 +403,11 @@ trait Helper
                             <img src="<?php echo esc_url( EAEL_PLUGIN_URL . 'assets/admin/images/templately/logo.svg' ); ?>" alt="">
                         </div>
                         <ul class="eael-promo-temp__feature__list">
-                            <li><?php esc_html_e('5,000+ Stunning Templates','essential-addons-for-elementor-lite'); ?></li>
+                            <li><?php esc_html_e('6500+ Ready Templates','essential-addons-for-elementor-lite'); ?></li>
                             <li><?php esc_html_e('Supports Elementor & Gutenberg','essential-addons-for-elementor-lite'); ?></li>
-                            <li><?php esc_html_e('Powering up 300,000+ Websites','essential-addons-for-elementor-lite'); ?></li>
+                            <li><?php esc_html_e('Powering up 4,00,000+ Websites','essential-addons-for-elementor-lite'); ?></li>
                             <li><?php esc_html_e('Cloud Collaboration with Team','essential-addons-for-elementor-lite'); ?></li>
+                            <li><?php esc_html_e('1-Click Full Site Import','essential-addons-for-elementor-lite'); ?></li>
                         </ul>
                         <form class="eael-promo-temp__form">
                             <label>
@@ -471,16 +496,268 @@ trait Helper
 
 	/**
 	 * eael_wpml_template_translation
+	 *
+	 * Resolve an Elementor template/library id to its translation in the current
+	 * language. Works for both WPML and Polylang:
+	 *  - WPML auto-registers elementor_library and answers wpml_object_id.
+	 *  - Polylang does NOT register elementor_library as translatable by default, so
+	 *    its wpml_object_id compat filter would return the id unchanged. We therefore
+	 *    resolve via pll_get_post(), which honours the translation group directly.
+	 *
 	 * @param $id
 	 * @return mixed|void
 	 */
     public function eael_wpml_template_translation($id){
 	    $postType = get_post_type( $id );
-	    if ( 'elementor_library' === $postType ) {
-		    return apply_filters( 'wpml_object_id', $id, $postType, true );
+	    if ( 'elementor_library' !== $postType ) {
+		    return $id;
 	    }
-	    return $id;
+
+	    // Never remap a document that is being edited rather than displayed — the
+	    // editor save, its render round-trips, the editor page and its preview. See
+	    // eael_is_elementor_editor_context() for why.
+	    if ( self::eael_is_elementor_editor_context( $id ) ) {
+		    return $id;
+	    }
+
+	    // Never remap while Elementor Pro is fetching the document for its own
+	    // theme-builder bookkeeping rather than to render it. See
+	    // eael_is_theme_builder_conditions_context() for why this is required.
+	    if ( $this->eael_is_theme_builder_conditions_context() ) {
+		    return $id;
+	    }
+
+   		// Never remap while Elementor Pro is reading or rebuilding its theme-builder
+	    // display conditions. Conditions_Cache::regenerate() looks a document up by id
+	    // purely to read its _elementor_conditions meta; handing it a translation
+	    // returns a document that carries no conditions of its own, so get_meta()
+	    // yields '' and Conditions_Cache::add() throws "Argument #2 ($conditions) must
+	    // be of type array, string given" — which surfaces as a critical error and
+	    // aborts every condition save on the site. The same remap in the save path
+	    // would otherwise write the condition onto the translation instead of the
+	    // template the user actually opened.
+	    if ( self::eael_is_conditions_cache_context() ) {
+		    return $id;
+	    }
+
+	    // Polylang path (independent of the translatable-post-type setting).
+	    if ( function_exists( 'pll_get_post' ) && function_exists( 'pll_current_language' ) ) {
+		    $lang = pll_current_language();
+		    if ( $lang ) {
+			    $translated = pll_get_post( $id, $lang );
+			    // pll_get_post returns false when no translation exists for $lang;
+			    // keep the original id in that case. Only swap to a translation that is
+			    // itself a *published* elementor_library — otherwise this hook (bound to
+			    // elementor/documents/get/post_id) would remap the id downstream of the
+			    // widget's own publish re-check and render a draft/private template to
+			    // anonymous visitors.
+			    if ( $translated && HelperClass::is_elementor_publish_template( $translated )
+			         && ! $this->eael_remap_drops_conditions( $id, $translated ) ) {
+				    return $translated;
+			    }
+		    }
+		    return $id;
+	    }
+
+	    // WPML path.
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
+	    $translated = apply_filters( 'wpml_object_id', $id, $postType, true );
+
+	    if ( $translated && (int) $translated !== (int) $id ) {
+		    // Same guard for WPML: never remap to a non-published template.
+		    if ( ! HelperClass::is_elementor_publish_template( $translated ) ) {
+			    return $id;
+		    }
+
+		    if ( $this->eael_remap_drops_conditions( $id, $translated ) ) {
+			    return $id;
+		    }
+	    }
+
+	    return $translated;
     }
+
+	/**
+	 * Is this document lookup part of editing it rather than displaying it?
+	 *
+	 * Elementor resolves a document through `elementor/documents/get/post_id`
+	 * before it writes: `Documents_Manager::ajax_save()` looks up the id the
+	 * editor sent and saves into whatever comes back. The same lookup opens the
+	 * editor and renders the edited document in its preview. Remapping there does
+	 * not translate anything for a visitor — it swaps the document being edited,
+	 * so Publish writes the elements and title into the translation and leaves
+	 * the template the user opened untouched (#910). The language behind that
+	 * remap is not the editor's either: on admin-ajax.php Polylang reads it from
+	 * a cookie shared by every tab.
+	 *
+	 * Deny-list, like the conditions guards below, so every display context EA
+	 * already translates in (front-end pages, AJAX-loaded content) keeps working.
+	 *
+	 * @since 6.8.4
+	 *
+	 * @param int $id Document id being resolved.
+	 *
+	 * @return bool
+	 */
+	public static function eael_is_elementor_editor_context( $id ) {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Read-only request routing checks; nothing is processed or stored.
+		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+
+		// Editor round-trips: save, autosave, discard, document config, widget renders.
+		if ( wp_doing_ajax() && 'elementor_ajax' === $action ) {
+			return true;
+		}
+
+		// The editor page itself (post.php?action=elementor).
+		if ( is_admin() && 'elementor' === $action ) {
+			return true;
+		}
+
+		// The preview frame rendering the document being edited. Templates embedded
+		// in it are other ids and still resolve to the current language.
+		if ( isset( $_GET['elementor-preview'] ) && absint( $_GET['elementor-preview'] ) === absint( $id ) ) {
+			return true;
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		// Elementor's own REST routes, which load a document in order to change it.
+		if ( defined( 'REST_REQUEST' ) && REST_REQUEST && isset( $GLOBALS['wp'] ) && ! empty( $GLOBALS['wp']->query_vars['rest_route'] ) ) {
+			if ( 0 === strpos( ltrim( (string) $GLOBALS['wp']->query_vars['rest_route'], '/' ), 'elementor/' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Is the current call coming from Elementor Pro's theme-builder display conditions?
+	 *
+	 * Mirrors the calling-context gate WPML applies in
+	 * WPML_Elementor_Translate_IDs::should_translate_template(), but as a narrow
+	 * deny-list so every rendering context EA already translates in keeps working.
+	 *
+	 * @since 6.7.2
+	 *
+	 * @return bool
+	 */
+	public static function eael_is_conditions_cache_context() {
+		$deny = [
+			'elementorpro\modules\themebuilder\classes\conditions_cache::regenerate',
+			'elementorpro\modules\themebuilder\classes\conditions_manager::save_conditions',
+		];
+
+		$trace = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 20 ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
+
+		foreach ( $trace as $frame ) {
+			if ( empty( $frame['function'] ) || empty( $frame['class'] ) ) {
+				continue;
+			}
+
+			if ( in_array( strtolower( $frame['class'] . '::' . $frame['function'] ), $deny, true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Is this filter running inside Elementor Pro's theme-builder conditions
+	 * machinery rather than a render?
+	 *
+	 * `Conditions_Cache::regenerate()` fetches every theme-builder document by id
+	 * purely to read its `_elementor_conditions` meta. If we hand it a translated
+	 * document instead of the one it asked for, that document carries no
+	 * conditions meta of its own, `$document->get_meta()` returns an empty string
+	 * and `Conditions_Cache::add( int $post_id, array $conditions )` fatals with
+	 * "Argument #2 ($conditions) must be of type array, string given" — which
+	 * aborts the save and returns HTTP 500 from admin-ajax.php, making display
+	 * conditions unsaveable site-wide.
+	 *
+	 * WPML solves the same problem the same way, by inspecting the call stack in
+	 * `WPML_Elementor_Translate_IDs::should_translate_template()`. We mirror that.
+	 *
+	 * Deliberately NOT gated on is_admin(): the conditions cache is also
+	 * regenerated lazily on the front end when it is empty (first pageview after
+	 * a cache flush), and the same fatal would take down the front end there.
+	 *
+	 * Matched on class name AND file path so the guard survives Elementor Pro
+	 * namespace refactors.
+	 *
+	 * @since 6.7.2
+	 * @return bool
+	 */
+	public function eael_is_theme_builder_conditions_context() {
+		// Cheap check first — the theme-builder conditions save request itself.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! empty( $_REQUEST['action'] ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$action = sanitize_key( wp_unslash( $_REQUEST['action'] ) );
+			if ( false !== strpos( $action, 'theme_builder' ) || false !== strpos( $action, 'save_conditions' ) ) {
+				return true;
+			}
+		}
+
+		$frames = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 20 ); // phpcs:ignore PHPCompatibility.FunctionUse.ArgumentFunctionsReportCurrentValue.NeedsInspection, WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace -- Detects an Elementor Pro Theme Builder conditions call, which exposes no public signal.
+
+		foreach ( $frames as $frame ) {
+			if ( ! empty( $frame['class'] ) && false !== stripos( $frame['class'], 'ThemeBuilder\\Classes\\Conditions' ) ) {
+				return true;
+			}
+
+			if ( ! empty( $frame['file'] ) ) {
+				$file = str_replace( '\\', '/', $frame['file'] );
+				if ( false !== stripos( $file, 'theme-builder/classes/conditions' ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Would swapping $id for $translated lose the document's display conditions?
+	 *
+	 * Defence in depth behind eael_is_theme_builder_conditions_context(): any
+	 * caller that reads `_elementor_conditions` off the document we return must
+	 * never be handed a translation that has no conditions of its own, because
+	 * Elementor Pro type-hints that meta as an array.
+	 *
+	 * @since 6.7.2
+	 *
+	 * @param int $id         Requested document id.
+	 * @param int $translated Candidate translation id.
+	 * @return bool
+	 */
+	protected function eael_remap_drops_conditions( $id, $translated ) {
+		$original = get_post_meta( $id, '_elementor_conditions', true );
+		if ( ! is_array( $original ) || empty( $original ) ) {
+			return false;
+		}
+
+		return ! is_array( get_post_meta( $translated, '_elementor_conditions', true ) );
+	}
+
+	/**
+	 * Register Elementor's template library as translatable in Polylang.
+	 *
+	 * Polylang ships no Elementor integration, so elementor_library is not
+	 * translatable out of the box — which means saved templates embedded in EA
+	 * widgets cannot be mapped to the current language. Opt the post type in so the
+	 * translation group (and Polylang's own UI) works for these templates.
+	 *
+	 * Hooked to: pll_get_post_types
+	 *
+	 * @param array $post_types
+	 * @param bool  $is_settings
+	 * @return array
+	 */
+	public function eael_pll_translate_elementor_library( $post_types, $is_settings = false ) {
+		$post_types['elementor_library'] = 'elementor_library';
+		return $post_types;
+	}
 
 	/**
 	 * eael_sanitize_template_param
@@ -526,12 +803,12 @@ trait Helper
 
 		check_ajax_referer( 'essential-addons-elementor', 'security' );
 
-		$ac_name     = sanitize_text_field( $_POST['ac_name'] );
-		$hastag      = sanitize_text_field( $_POST['hastag'] );
-		$c_key       = sanitize_text_field( $_POST['c_key'] );
-		$c_secret    = sanitize_text_field( $_POST['c_secret'] );
-		$widget_id   = sanitize_text_field( $_POST['widget_id'] );
-		$permalink   = sanitize_text_field( $_POST['page_permalink'] );
+		$ac_name     = ! empty( $_POST['ac_name'] ) ? sanitize_text_field( wp_unslash( $_POST['ac_name'] ) ) : '';
+		$hastag      = ! empty( $_POST['hastag'] ) ? sanitize_text_field( wp_unslash( $_POST['hastag'] ) ) : '';
+		$c_key       = ! empty( $_POST['c_key'] ) ? sanitize_text_field( wp_unslash( $_POST['c_key'] ) ) : '';
+		$c_secret    = ! empty( $_POST['c_secret'] ) ? sanitize_text_field( wp_unslash( $_POST['c_secret'] ) ) : '';
+		$widget_id   = ! empty( $_POST['widget_id'] ) ? sanitize_text_field( wp_unslash( $_POST['widget_id'] ) ) : '';
+		$permalink   = ! empty( $_POST['page_permalink'] ) ?  sanitize_text_field( wp_unslash( $_POST['page_permalink'] ) ) : '';
         $page_id     = url_to_postid($permalink);
         
         $settings = $this->eael_get_widget_settings($page_id, $widget_id);
@@ -544,13 +821,14 @@ trait Helper
             $key_pattern = '_transient_' . $ac_name . '%' . md5( $hastag . $c_key . $c_secret . $bearer_token ) . '_tf_cache';
         }
 
-		$sql     = "SELECT `option_name` AS `name`
-            FROM  $wpdb->options
-            WHERE `option_name` LIKE '$key_pattern'
-            ORDER BY `option_name`";
-
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$results = $wpdb->get_results( $sql );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$results = $wpdb->get_results( $wpdb->prepare(
+			"SELECT `option_name` AS `name`
+			FROM {$wpdb->options}
+			WHERE `option_name` LIKE %s
+			ORDER BY `option_name`",
+			$key_pattern
+		) );
 
 		foreach ( $results as $transient ) {
 			$cache_key = substr( $transient->name, 11 );
@@ -572,6 +850,8 @@ trait Helper
 
 			remove_all_actions( 'user_admin_notices' );
 			remove_all_actions( 'admin_notices' );
+			remove_all_actions( 'all_admin_notices' );
+			remove_all_actions( 'network_admin_notices' );
 
             // To showing notice in EA settings page we have to use 'eael_admin_notices' action hook
 			add_action( 'admin_notices', function () {
@@ -614,5 +894,179 @@ trait Helper
 			update_post_meta( $post_id, '_eael_post_view_count', ++ $view_count );
 		}
 	}
+
+   // Add background control for Liquid Glass Effects.
+	public function eael_wd_liquid_glass_effect_bg_color_effect( $obj, $effect, $default_bg_color, $selector ) {
+		$obj->add_control(
+			'eael_wd_liquid_glass_effect_bg_color_' . $effect,
+			[
+					'label'     => esc_html__( 'Background Color', 'essential-addons-for-elementor-lite' ),
+					'type'      => Controls_Manager::COLOR,
+					'default'   => $default_bg_color,
+					'selectors' => [
+						'{{WRAPPER}}.eael_wd_liquid_glass-'.$effect .' ' . $selector => 'background-color: {{VALUE}}',
+					],
+					'condition' => [
+						'eael_wd_liquid_glass_effect_switch' => 'yes',
+						'eael_wd_liquid_glass_effect'        => $effect,
+					],
+			]
+		);
+	}
+
+   //Add backdrop filter control for liquid glass effect.
+	public function eael_wd_liquid_glass_effect_backdrop_filter_effect( $obj, $effect, $default_size, $selector ) {
+		$selectors = in_array($effect, ['effect4','effect5','effect6'], true)
+			? [ "{{WRAPPER}}.eael_wd_liquid_glass-{$effect} {$selector}::before" => 'backdrop-filter: blur({{SIZE}}px)' ]
+			: [ "{{WRAPPER}}.eael_wd_liquid_glass-{$effect} {$selector}" => 'backdrop-filter: blur({{SIZE}}px)' ];
+
+		$obj->add_control(
+			'eael_wd_liquid_glass_effect_backdrop_filter_' . $effect,
+			[
+					'label' => esc_html__( 'Backdrop Filter', 'essential-addons-for-elementor-lite' ),
+					'type'  => Controls_Manager::SLIDER,
+					'range' => [
+						'px' => [
+							'min'  => 0,
+							'max'  => 50,
+							'step' => 1,
+						],
+					],
+					'default' => [
+						'size' => $default_size,
+					],
+					'selectors' => $selectors,
+					'condition' => [
+						'eael_wd_liquid_glass_effect_switch' => 'yes',
+						'eael_wd_liquid_glass_effect' => $effect,
+					],
+			]
+		);
+	}
+
+	// Add background color control for liquid glass effect flip box rear.
+	public function eael_wd_liquid_glass_effect_bg_color_effect_rear( $obj, $effect, $default_bg_color, $selector ) {
+		$obj->add_control(
+			'eael_wd_liquid_glass_effect_bg_color_rear_' . $effect,
+			[
+					'label'     => esc_html__( 'Background Color', 'essential-addons-for-elementor-lite' ),
+					'type'      => Controls_Manager::COLOR,
+					'default'   => $default_bg_color,
+					'selectors' => [
+						'{{WRAPPER}}.eael_wd_liquid_glass_rear-'.$effect .' ' . $selector => 'background-color: {{VALUE}}',
+					],
+					'condition' => [
+						'eael_wd_liquid_glass_effect_switch_rear' => 'yes',
+						'eael_wd_liquid_glass_effect_rear'        => $effect,
+					],
+			]
+		);
+	}
+
+	// Add backdrop filter control for liquid glass effect flip box rear.
+	public function eael_wd_liquid_glass_effect_backdrop_filter_effect_rear( $obj, $effect, $default_size, $selector ) {
+		$selectors = in_array($effect, ['effect4','effect5','effect6'], true)
+			? [ "{{WRAPPER}}.eael_wd_liquid_glass_rear-{$effect} {$selector}::before" => 'backdrop-filter: blur({{SIZE}}px)' ]
+			: [ "{{WRAPPER}}.eael_wd_liquid_glass_rear-{$effect} {$selector}" => 'backdrop-filter: blur({{SIZE}}px)' ];
+		$obj->add_control(
+			'eael_wd_liquid_glass_effect_backdrop_filter_rear_' . $effect,
+			[
+					'label' => esc_html__( 'Backdrop Filter', 'essential-addons-for-elementor-lite' ),
+					'type'  => Controls_Manager::SLIDER,
+					'range' => [
+						'px' => [
+							'min'  => 0,
+							'max'  => 50,
+							'step' => 1,
+						],
+					],
+					'default' => [
+						'size' => $default_size,
+					],
+					'selectors' => $selectors,
+					'condition' => [
+						'eael_wd_liquid_glass_effect_switch_rear' => 'yes',
+						'eael_wd_liquid_glass_effect_rear' => $effect,
+					],
+			]
+		);
+	}
+
+   //Add border effect for Liquid Glass Effects
+	public function eael_wd_liquid_glass_border_effect( $obj, $effect, $default_color, $selector, $condition ) {
+		$obj->add_group_control(
+		Group_Control_Border::get_type(),
+		[
+			'name'      => 'eael_wd_liquid_glass_border_'.$effect,
+			'fields_options' => [
+				'border' => [
+					'default' => 'solid',
+				],
+				'width' => [
+					'default' => [
+						'top'      => '1',
+						'right'    => '1',
+						'bottom'   => '1',
+						'left'     => '1',
+						'isLinked' =>  false,
+					],
+				],
+				'color' => [
+					'default' => $default_color,
+				],
+			],
+			'selector'  => '{{WRAPPER}}.eael_wd_liquid_glass_shadow-'.$effect .' '.$selector,
+			'condition' => [
+				'eael_wd_liquid_glass_effect_switch' => 'yes',
+				'eael_wd_liquid_glass_shadow_effect' => $effect,
+				'eael_wd_liquid_glass_effect'        => $condition,
+			],
+		]
+	);
+	}
+
+    // Add border radius effect for Liquid Glass Effects
+	public function eael_wd_liquid_glass_border_radius_effect( $obj, $effect, $selector, $default_radius, $condition ) {
+		$obj->add_control(
+		'eael_wd_liquid_glass_border_radius_'.$effect,
+		[
+			'label'      => esc_html__( 'Border Radius', 'essential-addons-for-elementor-lite' ),
+			'type'       => Controls_Manager::DIMENSIONS,
+			'size_units' => [ 'px', '%', 'rem', 'custom' ],
+			'default' => $default_radius,
+			'selectors'  => [
+				'{{WRAPPER}}.eael_wd_liquid_glass_shadow-'.$effect.' '.$selector => 'border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+			],
+			'condition' => [
+				'eael_wd_liquid_glass_effect_switch' => 'yes',
+				'eael_wd_liquid_glass_shadow_effect' => $effect,
+				'eael_wd_liquid_glass_effect'        => $condition,
+			],
+		]
+	);
+	}
+
+    // Add shadow effect for Liquid Glass Effects
+	public function eael_wd_liquid_glass_shadow_effect( $obj, $effect, $selector, $default_shadow, $condition ) {
+		$obj->add_group_control(
+			Group_Control_Box_Shadow::get_type(),
+			[
+					'name'      => 'eael_wd_liquid_glass_shadow_' . $effect,
+					'fields_options'     => [
+						'box_shadow_type' => [ 'default' => 'yes' ],
+						'box_shadow'      => [
+							'default' => $default_shadow,
+						],
+					],
+					'selector'  => '{{WRAPPER}}.eael_wd_liquid_glass_shadow-'.$effect.' ' . $selector,
+					'condition' => [
+						'eael_wd_liquid_glass_effect_switch'  => 'yes',
+						'eael_wd_liquid_glass_shadow_effect' => $effect,
+						'eael_wd_liquid_glass_effect'        => $condition,
+					],
+			]
+		);
+	}
+	
 }
 

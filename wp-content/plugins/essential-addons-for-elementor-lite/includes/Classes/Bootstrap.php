@@ -18,6 +18,7 @@ use Essential_Addons_Elementor\Traits\Woo_Product_Comparable;
 use Essential_Addons_Elementor\Traits\Controls;
 use Essential_Addons_Elementor\Traits\Facebook_Feed;
 use Essential_Addons_Elementor\Classes\Asset_Builder;
+use Essential_Addons_Elementor\Theme_Builder\Theme_Builder;
 use Essential_Addons_Elementor\Traits\Ajax_Handler;
 use Essential_Addons_Elementor\Pro\Classes\License\LicenseManager;
 
@@ -75,8 +76,8 @@ class Bootstrap
     protected $installer;
 
 
-    const EAEL_PROMOTION_FLAG = 15;
-    const EAEL_ADMIN_MENU_FLAG = 15;
+    const EAEL_PROMOTION_FLAG = 21;
+    const EAEL_ADMIN_MENU_FLAG = 21;
     /**
      * Singleton instance
      *
@@ -100,6 +101,13 @@ class Bootstrap
     {
         // init modules
         $this->installer = new WPDeveloper_Plugin_Installer();
+
+        // ThinkRank cross-promotion surfaces (admin-only; self-gates internally)
+        new ThinkRank_Promotion();
+
+        // Keep the shared `wpdeveloper_xspeed_offer` record in step with xSpeed
+        // being activated or deleted by any route, WP-CLI included.
+        XSpeed_Setup::register_hooks();
 
         // before init hook
         do_action('eael/before_init');
@@ -128,8 +136,21 @@ class Bootstrap
 		    new Asset_Builder( $this->registered_elements, $this->registered_extensions );
 	    }
 
+        // Theme Builder — header & footer templates built with Elementor. Boots
+        // the requirement notice instead of the module when Elementor is off, so
+        // the admin page stays reachable and says why it is empty.
+        Theme_Builder::boot();
+
         // Compatibility Support
         new Compatibility_Support();
+
+        // Mega Menu — registers the editor-side nested element type.
+        \Essential_Addons_Elementor\MegaMenu\Manager::instance()->init();
+        // Angie (Elementor AI Assistant) widget discovery; self-gates on ANGIE_VERSION
+        if ( $this->is_activate_elementor() ) {
+            new Angie_Integration( $this->registered_elements );
+        }
+
 
     }
 
@@ -195,7 +216,22 @@ class Bootstrap
         add_action('init', [$this, 'login_or_register_user']);
         add_filter('wp_new_user_notification_email', array($this, 'new_user_notification_email'), 10, 3);
         add_filter('wp_new_user_notification_email_admin', array($this, 'new_user_notification_email_admin'), 10, 3);
-        add_action( 'login_init', [$this, 'eael_redirect_to_reset_password'] );
+
+        // Email OTP Verification (Login | Register)
+        add_action('wp_ajax_eael_lr_send_otp',        [$this, 'eael_ajax_send_otp']);
+        add_action('wp_ajax_nopriv_eael_lr_send_otp', [$this, 'eael_ajax_send_otp']);
+        add_action('wp_ajax_eael_lr_verify_otp',        [$this, 'eael_ajax_verify_otp']);
+        add_action('wp_ajax_nopriv_eael_lr_verify_otp', [$this, 'eael_ajax_verify_otp']);
+
+        // Block any core authentication path (wp-login.php, XML-RPC, application
+        // passwords, wp_signon() calls elsewhere) for accounts still pending OTP
+        // verification. The EA login widget's own gate in log_user_in() only covers
+        // logins submitted through that widget's form/AJAX endpoint.
+        add_filter( 'wp_authenticate_user', [ $this, 'eael_block_otp_pending_authentication' ], 20, 2 );
+
+        // Flag unverified OTP register users in wp-admin → Users.
+        add_action('admin_footer-users.php', [$this, 'eael_lr_otp_pending_user_flag']);
+        add_action( 'init', [$this, 'eael_redirect_to_reset_password'] );
 
         if( 'on' === get_option( 'eael_custom_profile_fields' ) ){
             add_action( 'show_user_profile', [ $this, 'eael_extra_user_profile_fields' ] );
@@ -205,15 +241,62 @@ class Bootstrap
             add_action( 'edit_user_profile_update', [ $this, 'eael_save_extra_user_profile_fields' ] );
         }
 
+        // Admin Approval hooks registered unconditionally so option/widget checks
+        // happen at call time (correct site context in Multisite) rather than at init.
+        add_filter( 'wp_authenticate_user', [ $this, 'eael_block_pending_user_login' ], 10, 2 );
+        add_filter( 'manage_users_columns', [ $this, 'eael_add_user_status_column' ] );
+        add_filter( 'manage_users_custom_column', [ $this, 'eael_render_user_status_column' ], 10, 3 );
+        add_action( 'show_user_profile', [ $this, 'eael_show_approve_user_button' ] );
+        add_action( 'edit_user_profile', [ $this, 'eael_show_approve_user_button' ] );
+        add_action( 'personal_options_update', [ $this, 'eael_handle_approve_user' ] );
+        add_action( 'edit_user_profile_update', [ $this, 'eael_handle_approve_user' ] );
+        add_filter( 'bulk_actions-users', [ $this, 'eael_register_bulk_approve_action' ] );
+        add_filter( 'views_users', [ $this, 'eael_register_status_views' ] );
+        add_action( 'pre_get_users', [ $this, 'eael_filter_users_by_status' ] );
+        add_filter( 'handle_bulk_actions-users', [ $this, 'eael_handle_bulk_approve_action' ], 10, 3 );
+        add_filter( 'handle_bulk_actions-users', [ $this, 'eael_handle_bulk_reject_action' ], 10, 3 );
+        add_action( 'admin_notices', [ $this, 'eael_bulk_approve_admin_notice' ] );
+
         //rank math support
         add_filter('rank_math/researches/toc_plugins', [$this, 'toc_rank_math_support']);
 
-//        if(defined('WPML_TM_VERSION')){
-//	        add_filter( 'elementor/documents/get/post_id',[$this, 'eael_wpml_template_translation']);
-//        }
+        // Translate embedded Elementor templates/documents (saved templates used by
+        // Advanced Tabs, Advanced Accordion, Info Box, etc.) to the current language.
+        // eael_wpml_template_translation() handles both WPML and Polylang. Previously
+        // this was disabled and gated to WPML only, so Polylang sites always rendered
+        // the source-language template.
+        if ( defined( 'WPML_TM_VERSION' ) || defined( 'POLYLANG_VERSION' ) || function_exists( 'pll_get_post_language' ) ) {
+            add_filter( 'elementor/documents/get/post_id', [ $this, 'eael_wpml_template_translation' ] );
+        }
+
+        // Polylang has no Elementor integration, so the template library is not
+        // translatable by default. Opt it in so saved templates can be mapped to the
+        // current language (and managed from Polylang's UI).
+        if ( defined( 'POLYLANG_VERSION' ) || function_exists( 'pll_get_post_language' ) ) {
+            add_filter( 'pll_get_post_types', [ $this, 'eael_pll_translate_elementor_library' ], 10, 2 );
+        }
 
         //templately plugin support
-        if( !class_exists('Templately\Plugin') && !get_option('eael_templately_promo_hide') ) {
+        /**
+         * Filters whether Templately is offered from Elementor's add-element row.
+         *
+         * Off by default. The button there is the Templately logo and nothing
+         * else, so on a site without Templately it reads as Templately being
+         * installed rather than as an offer to install it — and it sits directly
+         * beside the EA button, which is a real one. The same offer is made in
+         * the Theme Builder's preset picker, as a panel that says what it is.
+         *
+         * The popup, its install and activate flow and its "don't show again"
+         * dismissal are all still here; this only decides whether anything opens
+         * them from that row.
+         *
+         * @since 6.7.4
+         *
+         * @param bool $enabled Whether to show the promo button.
+         */
+        $templately_promo = apply_filters( 'eael/templately_promo', false );
+
+        if( $templately_promo && !class_exists('Templately\Plugin') && !get_option('eael_templately_promo_hide') ) {
             add_action( 'elementor/editor/before_enqueue_scripts', [$this, 'templately_promo_enqueue_scripts'] );
             add_action( 'eael/before_enqueue_styles', [$this, 'templately_promo_enqueue_style'] );
             add_action( 'elementor/editor/footer', [ $this, 'print_template_views' ] );
@@ -221,6 +304,10 @@ class Bootstrap
         }
 
 	    if( class_exists( 'woocommerce' ) ) {
+		    // Login|Register custom fields on WooCommerce My Account edit-account page
+		    add_action( 'woocommerce_edit_account_form_fields', [ $this, 'eael_wc_account_form_fields' ] );
+		    add_action( 'woocommerce_save_account_details', [ $this, 'eael_wc_save_account_fields' ] );
+
 		    // quick view
 		    add_action( 'eael_woo_single_product_image', 'woocommerce_show_product_images', 20 );
 		    add_action( 'eael_woo_single_product_summary', 'woocommerce_template_single_title', 5 );
@@ -312,51 +399,19 @@ class Bootstrap
 
 	        // On Editor - Register WooCommerce frontend hooks before the Editor init.
 	        // Priority = 5, in order to allow plugins remove/add their wc hooks on init.
-	        if ( ! empty( $_REQUEST['action'] ) && 'elementor' === $_REQUEST['action'] ) {
+	        if ( ! empty( $_REQUEST['action'] ) && 'elementor' === $_REQUEST['action'] ) { //phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		        add_action( 'init', [ $this, 'register_wc_hooks' ], 5 );
 	        }
 
 			// update admin menu notice flag once visit EA settings page
 	        add_action( 'eael_admin_page_setting', [ $this, 'eael_show_admin_menu_notice' ] );
 
-		    if ( ! current_user_can( 'administrator' ) ) {
-			    add_filter( 'elementor/document/save/data', function ( $data ) {
-				    if ( isset( $data['settings']['eael_custom_js'] ) ) {
-					    $data['settings']['eael_custom_js'] = get_post_meta( get_the_ID(), '_eael_custom_js', true );
-				    }
-
-				    if ( empty( $data['elements'] ) ) {
-					    return $data;
-				    }
-
-				    $data['elements'] = Plugin::$instance->db->iterate_data( $data['elements'], function ( $element ) {
-					    if ( isset( $element['widgetType'] ) && $element['widgetType'] === 'eael-login-register' ) {
-						    if ( ! empty( $element['settings']['register_user_role'] ) ) {
-							    $element['settings']['register_user_role'] = '';
-						    }
-					    }
-
-					    if ( isset( $element['widgetType'] ) && $element['widgetType'] === 'eicon-woocommerce' ) {
-						    if ( ! empty( $element['settings']['eael_product_grid_products_status'] ) ) {
-							    $element['settings']['eael_product_grid_products_status'] = [ 'publish' ];
-						    }
-					    }
-
-                        if ( ! current_user_can( 'install_plugins' ) && isset( $element['widgetType'] ) && $element['widgetType'] === 'eaicon-advanced-data-table' ) {
-						    if ( ! empty( $element['settings']['ea_adv_data_table_source'] ) ) {
-							    $element['settings']['ea_adv_data_table_source'] = 'static';
-						    }
-					    }
-
-					    return $element;
-				    } );
-
-				    return $data;
-			    } );
-		    }
         } else {
 	        add_action( 'wp', [ $this, 'eael_post_view_count' ] );
         }
+
+	    // Registered on every request and checked at save time — see the method.
+	    add_filter( 'elementor/document/save/data', [ $this, 'eael_restrict_document_save_data' ], 10, 2 );
 
 	    // beehive theme compatibility
 	    add_filter( 'beehive_scripts', array( $this, 'beehive_theme_swiper_slider_compatibility' ), 999 );
@@ -378,5 +433,66 @@ class Bootstrap
 			$license_manager = LicenseManager::get_instance( [] );
 			$license_manager->plugin_updater();
 		}
+	}
+	/**
+	 * Drops document settings a non-administrator must not be able to save.
+	 *
+	 * Resets the Custom JS extension's code to what is already stored, the
+	 * Login | Register widget's new-user role, the Product Grid's post status
+	 * and, without `install_plugins`, the Advanced Data Table's source.
+	 *
+	 * Elementor applies this filter inside `Document::save()`, which runs for
+	 * the editor's AJAX save and also outside wp-admin — REST routes such as the
+	 * MCP update-settings ability or Components, template sources and imports.
+	 * The check used to be registered only when `is_admin()` was true and
+	 * decided once when the plugin loaded, so every one of those other paths
+	 * skipped it (#904). It is now registered on every request and the current
+	 * user is checked when the document is actually saved.
+	 *
+	 * @param array                          $data     Document data about to be saved.
+	 * @param \Elementor\Core\Base\Document|null $document Document being saved.
+	 *
+	 * @return array
+	 */
+	public function eael_restrict_document_save_data( $data, $document = null ) {
+		if ( current_user_can( 'administrator' ) ) {
+			return $data;
+		}
+
+		if ( isset( $data['settings']['eael_custom_js'] ) ) {
+			// The document's own ID: outside the editor there is no global post,
+			// and get_the_ID() would read the stored code from post 0.
+			$post_id = ( is_object( $document ) && method_exists( $document, 'get_main_id' ) ) ? $document->get_main_id() : get_the_ID();
+
+			$data['settings']['eael_custom_js'] = get_post_meta( $post_id, '_eael_custom_js', true );
+		}
+
+		if ( empty( $data['elements'] ) ) {
+			return $data;
+		}
+
+		$data['elements'] = Plugin::$instance->db->iterate_data( $data['elements'], function ( $element ) {
+			if ( isset( $element['widgetType'] ) && $element['widgetType'] === 'eael-login-register' ) {
+				if ( ! empty( $element['settings']['register_user_role'] ) ) {
+					$element['settings']['register_user_role'] = '';
+				}
+			}
+
+			if ( isset( $element['widgetType'] ) && $element['widgetType'] === 'eicon-woocommerce' ) {
+				if ( ! empty( $element['settings']['eael_product_grid_products_status'] ) ) {
+					$element['settings']['eael_product_grid_products_status'] = [ 'publish' ];
+				}
+			}
+
+			if ( ! current_user_can( 'install_plugins' ) && isset( $element['widgetType'] ) && $element['widgetType'] === 'eael-advanced-data-table' ) {
+				if ( ! empty( $element['settings']['ea_adv_data_table_source'] ) ) {
+					$element['settings']['ea_adv_data_table_source'] = 'static';
+				}
+			}
+
+			return $element;
+		} );
+
+		return $data;
 	}
 }

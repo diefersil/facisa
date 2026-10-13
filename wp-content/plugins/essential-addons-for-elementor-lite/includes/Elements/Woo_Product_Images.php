@@ -31,10 +31,10 @@ class Woo_Product_Images extends Widget_Base {
 	}
 
 	public function get_keywords() {
-		return [ 
-			'woocommerce', 
-			'images', 
-			'product', 
+		return [
+			'woocommerce',
+			'images',
+			'product',
 			'ea',
          	'essential addons',
 			'ea product',
@@ -100,7 +100,7 @@ class Woo_Product_Images extends Widget_Base {
 				],
 					'condition' => [
 						'eael_image_sale_flash' => 'yes',
-					],      
+					],
 			]
 		);
 
@@ -523,6 +523,19 @@ class Woo_Product_Images extends Widget_Base {
 		);
 
 		$this->add_control(
+			'eael_pi_show_loader',
+			[
+				'label'        => esc_html__( 'Image Loader', 'essential-addons-for-elementor-lite' ),
+				'description'  => esc_html__( 'Show a loading indicator until the images are ready.', 'essential-addons-for-elementor-lite' ),
+				'type'         => Controls_Manager::SWITCHER,
+				'label_on'     => esc_html__( 'Show', 'essential-addons-for-elementor-lite' ),
+				'label_off'    => esc_html__( 'Hide', 'essential-addons-for-elementor-lite' ),
+				'return_value' => 'yes',
+				'default'      => 'no',
+			]
+		);
+
+		$this->add_control(
 			'eael_pi_effects',
 			[
 				'label'   => esc_html__( 'Effects', 'essential-addons-for-elementor-lite' ),
@@ -540,6 +553,19 @@ class Woo_Product_Images extends Widget_Base {
 		);
 
 		$this->add_control(
+			'eael_pi_variation_image',
+			[
+				'label'        => esc_html__( 'Update Image on Variation Change', 'essential-addons-for-elementor-lite' ),
+				'description'  => esc_html__( 'Swap the main slider image to match the selected product variation. Reverts to the gallery when the selection is cleared.', 'essential-addons-for-elementor-lite' ),
+				'type'         => Controls_Manager::SWITCHER,
+				'label_on'     => esc_html__( 'Yes', 'essential-addons-for-elementor-lite' ),
+				'label_off'    => esc_html__( 'No', 'essential-addons-for-elementor-lite' ),
+				'return_value' => 'yes',
+				'default'      => 'yes',
+			]
+		);
+
+		$this->add_control(
 			'eael_pi_pagination',
 			[
 				'label'        => esc_html__( 'Pagination', 'essential-addons-for-elementor-lite' ),
@@ -549,7 +575,7 @@ class Woo_Product_Images extends Widget_Base {
 				'return_value' => 'yes',
 			]
 		);
-		
+
 		$this->add_control(
 			'eael_pi_navigation',
 			[
@@ -605,7 +631,7 @@ class Woo_Product_Images extends Widget_Base {
 		);
 
 		$this->start_popover();
-		
+
 		$this->add_control(
 			'eael_pi_thumb_desktop_items',
 			[
@@ -863,7 +889,7 @@ class Woo_Product_Images extends Widget_Base {
 		);
 
 		$this->end_controls_section();
-		
+
 	}
 
 	protected function eael_pi_data_settings( $settings ) {
@@ -884,6 +910,8 @@ class Woo_Product_Images extends Widget_Base {
 		$pi_data_settings['keyboard_press'] = ! empty( $settings['eael_pi_keyboard_press'] ) ? $settings['eael_pi_keyboard_press'] : false;
 		$pi_data_settings['thumb_navigation'] = ! empty( $settings['eael_pi_thumb_navigation'] ) ? $settings['eael_pi_thumb_navigation'] : false;
 		$pi_data_settings['image_resolution'] = ! empty( $settings['eael_pi_image_resolution'] ) ? $settings['eael_pi_image_resolution'] : 'full';
+		$pi_data_settings['variation_image'] = ! empty( $settings['eael_pi_variation_image'] ) ? $settings['eael_pi_variation_image'] : '';
+		$pi_data_settings['show_loader'] = ! empty( $settings['eael_pi_show_loader'] ) ? $settings['eael_pi_show_loader'] : '';
 		$pi_data_settings['pagination'] = ! empty( $settings['eael_pi_pagination'] ) ? $settings['eael_pi_pagination'] : 'false';
 		$pi_data_settings['navigation'] = ! empty( $settings['eael_pi_navigation'] ) ? $settings['eael_pi_navigation'] : '';
 		$pi_data_settings['sale_flash'] = ! empty( $settings['eael_image_sale_flash'] ) ? $settings['eael_image_sale_flash'] : '';
@@ -891,6 +919,7 @@ class Woo_Product_Images extends Widget_Base {
 		$pi_data_settings['eael_image_zoom_effect'] = ! empty( $settings['eael_image_zoom_effect'] ) ? $settings['eael_image_zoom_effect'] : '';
 		$pi_data_settings['eael_zoom_effect_type'] = ! empty( $settings['eael_zoom_effect_type'] ) ? $settings['eael_zoom_effect_type'] : '';
 		$pi_data_settings['eael_zoom_lens_border_radius'] = ! empty( $settings['eael_zoom_lens_border_radius']['size'] ) ? $settings['eael_zoom_lens_border_radius']['size'] . $settings['eael_zoom_lens_border_radius']['unit'] : '8px';
+		$pi_data_settings['eael_zoom_lens_size'] = ! empty( $settings['eael_zoom_lens_size']['size'] ) ? $settings['eael_zoom_lens_size']['size'] : '';
 
 		return $pi_data_settings;
 	}
@@ -898,7 +927,7 @@ class Woo_Product_Images extends Widget_Base {
 	protected function eael_product_gallery_html( $settings, $img_links, $product_featured_url ) {
 		?>
 		<div class="product_image_slider">
-				<?php 
+				<?php
 				if ( !empty( $img_links ) && is_array( $img_links ) ) {
 					$this->render_image_slider( $settings, $img_links );
 					$this->render_thumbnail_slider( $settings, $img_links );
@@ -921,6 +950,7 @@ class Woo_Product_Images extends Widget_Base {
 			'keyboard'=> [
 				'enabled' => $image_settings['keyboard_press'],
 			],
+			'variationImage' => $image_settings['variation_image'],
 		];
 
 		$sliderImages['navigation'] = [
@@ -953,7 +983,7 @@ class Woo_Product_Images extends Widget_Base {
 				'type' => $image_settings['eael_zoom_effect_type'],
 				'lensBorderRadius' => $image_settings['eael_zoom_lens_border_radius'],
 				'lensBorder' => $border_style,
-				'lensSize' => isset( $image_settings['eael_zoom_lens_size']['size'] ) ? $image_settings['eael_zoom_lens_size']['size'] : '',
+				'lensSize' => $image_settings['eael_zoom_lens_size'] ?? '',
 			];
 		}
 
@@ -963,6 +993,11 @@ class Woo_Product_Images extends Widget_Base {
 			'data-pi_image' => json_encode( $sliderImages ),
 			'class'        => 'product_image_slider__container ' . $slider_image_container_width,
 		] );
+
+		$image_ratio = $this->eael_pi_image_ratio( $img_links, $image_settings['image_resolution'] );
+		if ( $image_ratio ) {
+			$this->add_render_attribute( 'eael-pi-image', 'style', '--eael-pi-ratio:' . $image_ratio . ';' );
+		}
 		?>
 
 		<div <?php $this->print_render_attribute_string('eael-pi-image'); ?>>
@@ -981,7 +1016,7 @@ class Woo_Product_Images extends Widget_Base {
 					</div>
 					<?php } ?>
 					<div class="swiper-wrapper">
-						<?php 
+						<?php
 							foreach ( $img_links as $img_link ) {
 								$this->render_slide( $img_link, 'image_slider__image', $image_settings['image_resolution'] );
 							}
@@ -997,11 +1032,41 @@ class Woo_Product_Images extends Widget_Base {
 						<span class="swiper-button-prev"></span>
 						<span class="swiper-button-next"></span>
 						<?php
-					} 
+					}
 					?>
 				</div>
+				<?php if ( 'yes' === $image_settings['show_loader'] ) { ?>
+					<div class="eael-pi-loader"><span class="eael-pi-loader__spinner"></span></div>
+				<?php } ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Aspect ratio of the first gallery image, used to reserve the slider box
+	 * before the images are decoded.
+	 *
+	 * @param array|string $img_links Gallery attachment ids (front-end) or urls (editor).
+	 * @param string       $size      Selected image resolution.
+	 *
+	 * @return string Ratio as `width / height`, or an empty string when unknown.
+	 */
+	protected function eael_pi_image_ratio( $img_links, $size ) {
+		if ( empty( $img_links ) || ! is_array( $img_links ) ) {
+			return '';
+		}
+
+		$first = reset( $img_links );
+		if ( ! is_numeric( $first ) ) {
+			return '';
+		}
+
+		$image = wp_get_attachment_image_src( absint( $first ), $size );
+		if ( empty( $image[1] ) || empty( $image[2] ) ) {
+			return '';
+		}
+
+		return absint( $image[1] ) . ' / ' . absint( $image[2] );
 	}
 
 	protected function render_thumbnail_slider( $settings, $img_links ) {
@@ -1074,7 +1139,7 @@ class Woo_Product_Images extends Widget_Base {
 				],
 			];
 		}
-		
+
 		if ( 'yes' == $thumb_settings['image_autoplay'] ) {
 			$sliderThumbs['autoplay'] = [
 				'delay' => $thumb_settings['autoplay_delay'],
@@ -1091,23 +1156,24 @@ class Woo_Product_Images extends Widget_Base {
 		?>
 		<div <?php $this->print_render_attribute_string( 'eael-pi-thumb' ); ?>>
 			<div class="swiper-container">
-				<?php if( 'yes' == $thumb_settings['thumbnail'] ) {
-					$single_thumb_img = ( count($img_links) > 1 ) ? '' : 'single-thumb-img';
-					$thumb_size = $thumb_settings['thumbnail_size']; ?>
-					<div class="swiper-wrapper <?php esc_attr_e( $single_thumb_img ); ?>">
-						<?php
-							foreach ( $img_links as $img_link ) {
-								$this->render_slide( $img_link, 'product_image_slider__thumbs__image', $thumb_size );
-							}
-						?>
-					</div>
-					<?php $print_left_right = in_array( $thumb_settings['thumb_position'], $thumb_position ) ? 'left-right-prev' : ''; ?>
-						<?php if ( 'yes' == $thumb_settings['thumb_navigation'] && count( $img_links ) > $thumb_settings['desktop'] ) { ?>
-							<span class="swiper-button-prev <?php esc_attr_e( $print_left_right ); ?>"></span>
-							<span class="swiper-button-next <?php esc_attr_e( $print_left_right ); ?>"></span>
-						<?php } ?>
-					<?php } ?>
-				</div>
+                <?php $single_thumb_img = (count($img_links) > 1) ? '' : 'single-thumb-img'; ?>
+                <div class="swiper-wrapper <?php echo esc_attr( $single_thumb_img ); ?>">
+                    <?php if ('yes' == $thumb_settings['thumbnail']) {
+                        $thumb_size = $thumb_settings['thumbnail_size'];
+                        foreach ($img_links as $img_link) {
+                            $this->render_slide($img_link, 'product_image_slider__thumbs__image', $thumb_size);
+                        }
+                    }
+                    ?>
+                </div>
+                <?php if ( 'yes' == $thumb_settings['thumbnail'] ) {
+                    $print_left_right = in_array($thumb_settings['thumb_position'], $thumb_position) ? 'left-right-prev' : '';
+                    if ( 'yes' == $thumb_settings['thumb_navigation'] && count( $img_links ) > $thumb_settings['desktop'] ) { ?>
+                        <span class="swiper-button-prev <?php echo esc_attr( $print_left_right ); ?>"></span>
+                        <span class="swiper-button-next <?php echo esc_attr( $print_left_right ); ?>"></span>
+                    <?php }
+                } ?>
+			</div>
 		</div>
 		<?php
 	}
@@ -1116,13 +1182,13 @@ class Woo_Product_Images extends Widget_Base {
 		?>
 		<div class="swiper-slide">
 			<div class="<?php echo esc_attr( $class ); ?>">
-			<?php 
+			<?php
 			if ( \Elementor\Plugin::$instance->editor->is_edit_mode() ) {
 				?>
 				<img src="<?php echo esc_url( $img_link ); ?>" alt="" />
 				<?php
 			} else {
-				echo wp_get_attachment_image( $img_link, $size ); 
+				echo wp_get_attachment_image( $img_link, $size );
 			}
 			?>
 			</div>
@@ -1134,10 +1200,10 @@ class Woo_Product_Images extends Widget_Base {
 		if ( !function_exists( 'WC' ) ) {
 			return;
 		}
-		
+
 		global $product;
 		$eael_product_id = apply_filters( 'eael_product_image_product_id', false, $this );
-		$product  = Helper::get_product( $eael_product_id );
+		$product  = Helper::get_product( $eael_product_id ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 		$settings = $this->get_settings_for_display();
 		$widget_id = $this->get_id();
 
@@ -1148,8 +1214,8 @@ class Woo_Product_Images extends Widget_Base {
 			] );
       ?>
       <div <?php $this->print_render_attribute_string( 'eael_thumb_position' ); ?>>
-            <?php 
-				if( \Elementor\Plugin::$instance->editor->is_edit_mode() || get_post_type( get_the_ID() ) === 'templately_library' ) { 
+            <?php
+				if( \Elementor\Plugin::$instance->editor->is_edit_mode() || get_post_type( get_the_ID() ) === 'templately_library' ) {
 					$default_image = EAEL_PLUGIN_URL . 'assets/front-end/img/eael-default-placeholder.png';
 					$img_links = array_fill( 0, 6, $default_image );
 

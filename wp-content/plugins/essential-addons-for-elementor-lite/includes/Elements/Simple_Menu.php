@@ -130,7 +130,8 @@ class Simple_Menu extends Widget_Base
                     'type'        => Controls_Manager::NOTICE,
                     'notice_type' => 'info',
                     'dismissible' => false,
-                    'content'     => sprintf(__('Go to the <a href="%s" target="_blank">Menu screen</a> to manage your menus.', 'essential-addons-for-elementor-lite'), admin_url('nav-menus.php')),
+                    // Translators: %s: URL to the Menus screen.
+                    'content'     => sprintf(__('Go to the <a href="%s" target="_blank">Menus screen</a> to manage your menus.', 'essential-addons-for-elementor-lite'), admin_url('nav-menus.php')),
                     'separator'   => 'after',
                 ]
             );
@@ -142,6 +143,7 @@ class Simple_Menu extends Widget_Base
                     'notice_type' => 'warning',
                     'dismissible' => false,
                     'heading'     => esc_html__( 'There are no menus in your site.', 'essential-addons-for-elementor-lite' ),
+                    // Translators: %s: URL to the Menus screen.
                     'content'     => sprintf(__('Go to the <a href = "%s" target = "_blank">Menus screen</a> to create one.', 'essential-addons-for-elementor-lite'), admin_url('nav-menus.php?action = edit&menu = 0')),
                     'separator'   => 'after',
                 ]
@@ -234,6 +236,23 @@ class Simple_Menu extends Widget_Base
                 'label_on'     => __('Yes', 'essential-addons-for-elementor-lite'),
                 'label_off'    => __('No', 'essential-addons-for-elementor-lite'),
                 'default'      => 'no',
+            ]
+        );
+
+        $this->add_control(
+            'eael_simple_menu_link_width',
+            [
+                'label'        => __('Link Width', 'essential-addons-for-elementor-lite'),
+                'type'         => Controls_Manager::SELECT,
+                'options'      => [
+                    'full-width' => __('Full Width', 'essential-addons-for-elementor-lite'),
+                    'auto'       => __('Auto', 'essential-addons-for-elementor-lite'),
+                ],
+                'default'      => 'full-width',
+                'prefix_class' => 'eael-simple-menu-link-',
+                'selectors' => [
+                    '{{WRAPPER}}.eael-simple-menu-link-auto.eael-hamburger--responsive .eael-simple-menu.eael-simple-menu-responsive li a' => 'display: inline-block; width: auto;',
+                ],
             ]
         );
 
@@ -645,8 +664,8 @@ class Simple_Menu extends Widget_Base
                 'options'   => [
                     'eael-simple-menu-dropdown-animate-fade'     => __('Fade', 'essential-addons-for-elementor-lite'),
                     'eael-simple-menu-dropdown-animate-to-top'   => __('To Top', 'essential-addons-for-elementor-lite'),
-                    'eael-simple-menu-dropdown-animate-zoom-in'  => __('ZoomIn', 'essential-addons-for-elementor-lite'),
-                    'eael-simple-menu-dropdown-animate-zoom-out' => __('ZoomOut', 'essential-addons-for-elementor-lite'),
+                    'eael-simple-menu-dropdown-animate-zoom-in'  => __('Zoom In', 'essential-addons-for-elementor-lite'),
+                    'eael-simple-menu-dropdown-animate-zoom-out' => __('Zoom Out', 'essential-addons-for-elementor-lite'),
                 ],
                 'default'   => 'eael-simple-menu-dropdown-animate-to-top',
                 'condition' => [
@@ -994,7 +1013,16 @@ class Simple_Menu extends Widget_Base
                 'label'      => __('Important Note', 'essential-addons-for-elementor-lite'),
                 'show_label' => false,
                 'type'       => Controls_Manager::RAW_HTML,
-                'raw'        => __('<div style="font-size: 11px;font-style:italic;line-height:1.4;color:#a4afb7;">Following options are only available in the <span style="color:#d30c5c"><strong>Small</strong></span> screens for <span style="color:#d30c5c"><strong>Horizontal</strong></span> Layout, and all screens for <span style="color:#d30c5c"><strong>Vertical</strong></span> Layout</div>', 'essential-addons-for-elementor-lite'),
+                'raw' => sprintf(
+                    '<div style="font-size:11px;font-style:italic;line-height:1.4;color:#a4afb7;">%s</div>',
+                    sprintf(
+                        /* translators: 1: Small screen label, 2: Horizontal layout label, 3: Vertical layout label */
+                        __('Following options are only available in the %1$s screens for %2$s Layout, and all screens for %3$s Layout', 'essential-addons-for-elementor-lite'),
+                        '<span style="color:#d30c5c"><strong>Small</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Horizontal</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Vertical</strong></span>'
+                    )
+                ),
             ]
         );
 
@@ -1086,8 +1114,16 @@ class Simple_Menu extends Widget_Base
                 'label'      => __('Important Note', 'essential-addons-for-elementor-lite'),
                 'show_label' => false,
                 'type'       => Controls_Manager::RAW_HTML,
-                'raw'        => __('<div style="font-size: 11px;font-style:italic;line-height:1.4;color:#a4afb7;">Following options are only available in the <span style="color:#d30c5c"><strong>Small</strong></span> screens for <span style="color:#d30c5c"><strong>Horizontal</strong></span> Layout, and all screens for <span style="color:#d30c5c"><strong>Vertical</strong></span> Layout</div>', 'essential-addons-for-elementor-lite'),
-
+                'raw' => sprintf(
+                    '<div style="font-size:11px;font-style:italic;line-height:1.4;color:#a4afb7;">%s</div>',
+                    sprintf(
+                        /* translators: 1: Small screen label, 2: Horizontal layout label, 3: Vertical layout label */
+                        __('Following options are only available in the %1$s screens for %2$s Layout, and all screens for %3$s Layout', 'essential-addons-for-elementor-lite'),
+                        '<span style="color:#d30c5c"><strong>Small</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Horizontal</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Vertical</strong></span>'
+                    )
+                ),
             ]
         );
 
@@ -1181,8 +1217,16 @@ class Simple_Menu extends Widget_Base
                 'label'      => __('Important Note', 'essential-addons-for-elementor-lite'),
                 'show_label' => false,
                 'type'       => Controls_Manager::RAW_HTML,
-                'raw'        => __('<div style="font-size: 11px;font-style:italic;line-height:1.4;color:#a4afb7;">Following options are only available in the <span style="color:#d30c5c"><strong>Small</strong></span> screens for <span style="color:#d30c5c"><strong>Horizontal</strong></span> Layout, and all screens for <span style="color:#d30c5c"><strong>Vertical</strong></span> Layout</div>', 'essential-addons-for-elementor-lite'),
-
+                'raw' => sprintf(
+                    '<div style="font-size:11px;font-style:italic;line-height:1.4;color:#a4afb7;">%s</div>',
+                    sprintf(
+                        /* translators: 1: Small screen label, 2: Horizontal layout label, 3: Vertical layout label */
+                        __('Following options are only available in the %1$s screens for %2$s Layout, and all screens for %3$s Layout', 'essential-addons-for-elementor-lite'),
+                        '<span style="color:#d30c5c"><strong>Small</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Horizontal</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Vertical</strong></span>'
+                    )
+                ),
             ]
         );
 
@@ -1399,7 +1443,16 @@ class Simple_Menu extends Widget_Base
                 'label'      => __('Important Note', 'essential-addons-for-elementor-lite'),
                 'show_label' => false,
                 'type'       => Controls_Manager::RAW_HTML,
-                'raw'        => __('<div style="font-size: 11px;font-style:italic;line-height:1.4;color:#a4afb7;">Following options are only available in the <span style="color:#d30c5c"><strong>Small</strong></span> screens for <span style="color:#d30c5c"><strong>Horizontal</strong></span> Layout, and all screens for <span style="color:#d30c5c"><strong>Vertical</strong></span> Layout</div>', 'essential-addons-for-elementor-lite'),
+                'raw' => sprintf(
+                    '<div style="font-size:11px;font-style:italic;line-height:1.4;color:#a4afb7;">%s</div>',
+                    sprintf(
+                        /* translators: 1: small screen label, 2: horizontal layout label, 3: vertical layout label */
+                        __('Following options are only available in the %1$s screens for %2$s Layout, and all screens for %3$s Layout', 'essential-addons-for-elementor-lite'),
+                        '<span style="color:#d30c5c"><strong>Small</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Horizontal</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Vertical</strong></span>'
+                    )
+                ),
             ]
         );
 
@@ -1493,8 +1546,16 @@ class Simple_Menu extends Widget_Base
                 'label'      => __('Important Note', 'essential-addons-for-elementor-lite'),
                 'show_label' => false,
                 'type'       => Controls_Manager::RAW_HTML,
-                'raw'        => __('<div style="font-size: 11px;font-style:italic;line-height:1.4;color:#a4afb7;">Following options are only available in the <span style="color:#d30c5c"><strong>Small</strong></span> screens for <span style="color:#d30c5c"><strong>Horizontal</strong></span> Layout, and all screens for <span style="color:#d30c5c"><strong>Vertical</strong></span> Layout</div>', 'essential-addons-for-elementor-lite'),
-
+                'raw' => sprintf(
+                    '<div style="font-size:11px;font-style:italic;line-height:1.4;color:#a4afb7;">%s</div>',
+                    sprintf(
+                        /* translators: 1: small screen label, 2: horizontal layout label, 3: vertical layout label. */
+                        __('Following options are only available in the %1$s screens for %2$s Layout, and all screens for %3$s Layout', 'essential-addons-for-elementor-lite'),
+                        '<span style="color:#d30c5c"><strong>Small</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Horizontal</strong></span>',
+                        '<span style="color:#d30c5c"><strong>Vertical</strong></span>'
+                    )
+                ),
             ]
         );
 
@@ -1560,8 +1621,7 @@ class Simple_Menu extends Widget_Base
             }
 
             $dropdown_options[ $breakpoint_key ] = sprintf(
-                /* translators: 1: Breakpoint label, 2: `>` character, 3: Breakpoint value */
-                esc_html__( '%1$s (%2$s %3$dpx)', 'essential-addons-for-elementor-lite' ),
+                '%1$s (%2$s %3$dpx)',
                 $breakpoint_instance->get_label(),
                 '>',
                 $breakpoint_instance->get_value()
@@ -1594,7 +1654,7 @@ class Simple_Menu extends Widget_Base
 	    }
 
         $menu_classes      = ['eael-simple-menu', $settings['eael_simple_menu_dropdown_animation'], 'eael-simple-menu-indicator', $settings['eael_hamburger_menu_item_alignment']];
-        $container_classes = ['eael-simple-menu-container', $align, $fullWidth, $settings['eael_simple_menu_dropdown_item_alignment'], $settings['eael_simple_menu_preset']];
+        $container_classes = ['eael-simple-menu-container', 'eael-simple-menu--loading', $align, $fullWidth, $settings['eael_simple_menu_dropdown_item_alignment'], $settings['eael_simple_menu_preset'], 'eael-simple-menu-link-' . esc_html($settings['eael_simple_menu_link_width'])];
 
         if ($settings['eael_simple_menu_layout'] == 'horizontal') {
             $menu_classes[] = 'eael-simple-menu-horizontal';
@@ -1639,6 +1699,8 @@ class Simple_Menu extends Widget_Base
             ];
 
 	        //Check breakpoint form hamburger options
+	        $hamburger_breakpoint = 0;
+
 	        if ( ! empty( $hamburger_device ) && 'none' !== $hamburger_device ) {
 		        if ( 'desktop' === $hamburger_device ) {
 			        $breakpoints                     = method_exists( Plugin::$instance->breakpoints, 'get_breakpoints_config' ) ? Plugin::$instance->breakpoints->get_breakpoints_config() : [];
@@ -1646,6 +1708,8 @@ class Simple_Menu extends Widget_Base
 		        } else {
 			        $eael_get_breakpoint_from_option = Plugin::$instance->breakpoints->get_breakpoints( $hamburger_device )->get_value();
 		        }
+
+		        $hamburger_breakpoint = absint( $eael_get_breakpoint_from_option );
 
 		        echo "<style>
                         @media screen and (max-width: " . esc_html( $eael_get_breakpoint_from_option ) . "px) {
@@ -1663,6 +1727,65 @@ class Simple_Menu extends Widget_Base
                         }
                     </style>";
 	        }
+
+	        /**
+	         * Loading state.
+	         *
+	         * The real layout rules sit behind `.eael-hamburger--responsive` /
+	         * `.eael-hamburger--not-responsive`, which only JS adds, so between first
+	         * paint and init these rules stand in for the settled layout and have to
+	         * mirror it per orientation and per alignment - otherwise the menu visibly
+	         * re-flows the moment the loading class comes off.
+	         *
+	         * Keyed off the classes already on the markup rather than off $settings, and
+	         * scoped to this widget instance: a page can hold several menus with
+	         * different breakpoints, and an unscoped rule from one of them would
+	         * out-specify another's hamburger `display: none`.
+	         */
+
+	        // A CSS context, not an HTML one - entities are not decoded inside <style>,
+	        // so whitelist to a valid CSS identifier instead of using an HTML escaper.
+	        $menu_id      = preg_replace( '/[^a-zA-Z0-9_-]/', '', (string) $this->get_id() );
+	        $menu_scope   = '.elementor-element-' . $menu_id . ' .eael-simple-menu-container.eael-simple-menu--loading';
+
+	        $loading_layout_css = "
+                        /* Left aligned horizontal menus lay out with `float: left` on the
+                           items, so their list stays `block` - forcing flex here would
+                           take the items out of flow and break the row. Only centre and
+                           right aligned horizontal menus are inline-flex. */
+                        {$menu_scope} > ul.eael-simple-menu-horizontal,
+                        {$menu_scope} > ul.eael-simple-menu-vertical {
+                            display: block;
+                        }
+                        {$menu_scope}.eael-simple-menu-align-center {
+                            text-align: center;
+                        }
+                        {$menu_scope}.eael-simple-menu-align-right {
+                            text-align: right;
+                        }
+                        {$menu_scope}.eael-simple-menu-align-center > ul.eael-simple-menu-horizontal,
+                        {$menu_scope}.eael-simple-menu-align-right > ul.eael-simple-menu-horizontal {
+                            display: -webkit-inline-box;
+                            display: -ms-inline-flexbox;
+                            display: inline-flex;
+                        }
+                        {$menu_scope} .eael-simple-menu-toggle,
+                        {$menu_scope} .eael-simple-menu-toggle-text {
+                            display: none;
+                        }";
+
+	        // Below the hamburger breakpoint the menu is collapsed and the toggle is
+	        // shown, so the layout rules must not reach there - otherwise they
+	        // out-specify that state and the menu flashes open on small screens.
+	        if ( $hamburger_breakpoint ) {
+		        $loading_layout_css = "
+                        @media screen and (min-width: " . ( $hamburger_breakpoint + 1 ) . "px) {" . $loading_layout_css . "
+                        }";
+	        }
+
+	        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSS from a CSS-identifier-whitelisted widget ID and absint() breakpoint; HTML escaping would break the selectors.
+	        echo "<style>" . $loading_layout_css . "
+                    </style>";
             ?>
             <div <?php $this->print_render_attribute_string('eael-simple-menu'); ?>>
                 <?php echo wp_nav_menu( $args ); ?>

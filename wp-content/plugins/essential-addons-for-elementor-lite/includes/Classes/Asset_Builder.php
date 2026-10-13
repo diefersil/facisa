@@ -332,7 +332,7 @@ class Asset_Builder {
 			EAEL_PLUGIN_VERSION
 		);
 
-		wp_register_script(
+		wp_register_script( // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.NotInFooter -- Kept in the header; moving it would change script load order on existing sites.
 			'font-awesome-4-shim',
 			ELEMENTOR_ASSETS_URL . 'lib/font-awesome/js/v4-shims.min.js',
 			false,
@@ -347,7 +347,7 @@ class Asset_Builder {
 			EAEL_PLUGIN_VERSION
 		);
 
-		wp_register_script(
+		wp_register_script( // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.NotInFooter -- Kept in the header; moving it would change script load order on existing sites.
 			'eael-reading-progress',
 			EAEL_PLUGIN_URL . 'assets/front-end/js/view/reading-progress.min.js',
 			[ 'jquery' ],
@@ -362,7 +362,7 @@ class Asset_Builder {
 			EAEL_PLUGIN_VERSION
 		);
 
-		wp_register_script(
+		wp_register_script( // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.NotInFooter -- Kept in the header; moving it would change script load order on existing sites.
 			'eael-table-of-content',
 			EAEL_PLUGIN_URL . 'assets/front-end/js/view/table-of-content.min.js',
 			[ 'jquery' ],
@@ -377,12 +377,15 @@ class Asset_Builder {
 			EAEL_PLUGIN_VERSION
 		);
 
-		wp_register_script(
+		wp_register_script( // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.NotInFooter -- Kept in the header; moving it would change script load order on existing sites.
 			'eael-scroll-to-top',
 			EAEL_PLUGIN_URL . 'assets/front-end/js/view/scroll-to-top.min.js',
 			[ 'jquery' ],
 			EAEL_PLUGIN_VERSION
 		);
+
+		// register custom cursor assets
+		do_action( 'eael/register_custom_cursor_assets' );
 
 		// localize object
 		$this->localize_objects = apply_filters( 'eael/localize_objects', [

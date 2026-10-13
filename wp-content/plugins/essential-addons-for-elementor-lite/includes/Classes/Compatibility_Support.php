@@ -1,6 +1,10 @@
 <?php
 namespace Essential_Addons_Elementor\Classes;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+} // Exit if accessed directly
+
 class Compatibility_Support {
 	public function __construct() {
 		if ( $this->is_mondialrelay_plugin_active() ) {
@@ -28,7 +32,11 @@ class Compatibility_Support {
 
 		// Parse shipping method details
 		$method_string = $chosen_shipping_methods[0];
-		list($method_id, $instance_id) = explode(':', $method_string);
+        // Ensure method_string is a string and contains a colon
+        if ( !is_string($method_string) || strpos($method_string, ':') === false ) {
+            return;
+        }
+        list($method_id, $instance_id) = explode(':', $method_string, 2);
 
 		// Add shipping form if Mondial Relay is selected
 		if ($method_id === 'mondialrelay_official_shipping') {
@@ -42,7 +50,13 @@ class Compatibility_Support {
 	* @return bool
 	*/
 	private function is_mondialrelay_plugin_active() {
+		// Include plugin.php to ensure plugin functions are available
+		if ( ! function_exists( 'is_plugin_active_for_network' ) ) {
+			include_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
 		$plugin_path = 'mondialrelay-wordpress/mondialrelay-wordpress.php';
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 		return in_array( $plugin_path, apply_filters('active_plugins', get_option('active_plugins' ) ) ) || is_plugin_active_for_network( $plugin_path );
 	}
 
@@ -55,11 +69,11 @@ class Compatibility_Support {
 	public function eael_mondialrelay_shipping_form_after() {
 		?>
 		<tr class="mrwp" style="display:none">
-			<th><?php echo __('Livraison Mondial Relay','essential-addons-for-elementor-lite');?>
+			<th><?php echo esc_html__('Livraison Mondial Relay','essential-addons-for-elementor-lite');?>
 			<br>
-			<em id="parcel_shop_info" class="parcel_shop_info"><?php echo __("Vous n'avez pas encore choisi de Point Relais®",'essential-addons-for-elementor-lite');?></em>
+			<em id="parcel_shop_info" class="parcel_shop_info"><?php echo esc_html__("Vous n'avez pas encore choisi de Point Relais®",'essential-addons-for-elementor-lite');?></em>
 			</th>
-			<td><a id="modaal_link" class="modaal_link" href="#modaal"><?php echo  __('Choisir un Point Relais®', 'essential-addons-for-elementor-lite'); ?></a></td>
+			<td><a id="modaal_link" class="modaal_link" href="#modaal"><?php echo esc_html__('Choisir un Point Relais®', 'essential-addons-for-elementor-lite'); ?></a></td>
 		</tr>
 		<script>
 			jQuery(".modaal_link").modaal({

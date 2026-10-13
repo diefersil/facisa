@@ -119,11 +119,15 @@ class Testimonial extends Widget_Base {
 					],
 					'content-top-icon-title-inline' => [
 						'title' => esc_html__('Content Top | Icon Title Inline', 'essential-addons-for-elementor-lite'),
-						'image' => $image_path . 'content-top-icon-title-inline.png'
+						'image' => $image_path . 'content-bottom-icon-title-inline.png'
 					],
 					'content-bottom-icon-title-inline' => [
 						'title' => esc_html__('Content Bottom | Icon Title Inline', 'essential-addons-for-elementor-lite'),
-						'image' => $image_path . 'content-bottom-icon-title-inline.png'
+						'image' => $image_path . 'content-top-icon-title-inline.png'
+					],
+					'simple-layout' => [
+						'title' => esc_html__('Simple Layout', 'essential-addons-for-elementor-lite'),
+						'image' => $image_path . 'icon-img-left-content.png'
 					],
 				],
 				'default'     => 'default-style',
@@ -198,7 +202,7 @@ class Testimonial extends Widget_Base {
 				'default' => esc_html__( 'John Doe', 'essential-addons-for-elementor-lite'),
 				'dynamic' => [ 'active' => true ],
 				'ai' => [
-					'active' => false,
+					'active' => true,
 				],
 			]
 		);
@@ -211,7 +215,7 @@ class Testimonial extends Widget_Base {
 				'default' => esc_html__( 'Codetic', 'essential-addons-for-elementor-lite'),
 				'dynamic' => [ 'active' => true ],
 				'ai' => [
-					'active' => false,
+					'active' => true,
 				],
 			]
 		);
@@ -225,7 +229,7 @@ class Testimonial extends Widget_Base {
 			]
 		);
 
-		$this->add_control(
+		$this->add_responsive_control(
 			'content_height',
 			[
 				'label' => esc_html__( 'Height', 'essential-addons-for-elementor-lite'),
@@ -419,6 +423,9 @@ class Testimonial extends Widget_Base {
 				'type'         => Controls_Manager::SWITCHER,
 				'return_value' => 'yes',
 				'default'      => '',
+				'condition'    => [
+					'eael_testimonial_style!' => 'simple-layout'
+				]
 			]
 		);
 
@@ -894,6 +901,7 @@ class Testimonial extends Widget_Base {
 
 	protected function render_testimonial_image() {
 		$settings = $this->get_settings();
+		$settings['image'] = HelperClass::eael_wpml_translate_media( $settings['image'] ); // WPML Media Translation compatibility
 		$image = Group_Control_Image_Size::get_attachment_image_html( $settings );
 		if( ! empty($image) && ! empty($settings['eael_testimonial_enable_avatar']) ) {
 			ob_start();
@@ -937,7 +945,7 @@ class Testimonial extends Widget_Base {
 	protected function testimonial_desc() {
 		$settings = $this->get_settings_for_display();
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		echo '<div class="eael-testimonial-text">'. $this->parse_text_editor( $settings['eael_testimonial_description'] ) .'</div>';
+		echo '<div class="eael-testimonial-text">'. $this->parse_text_editor( wp_kses( $settings['eael_testimonial_description'], HelperClass::eael_allowed_tags() ) ) .'</div>';
 	}
 
 
@@ -971,7 +979,7 @@ class Testimonial extends Widget_Base {
 
 	<div <?php $this->print_render_attribute_string('eael_testimonial_wrap'); ?>>
 		<?php
-			if ( 'top' === $settings['eael_testimonial_rating_position'] ) {
+			if ( 'top' === $settings['eael_testimonial_rating_position'] && 'simple-layout' !== $settings['eael_testimonial_style'] ) {
 				$this->render_testimonial_rating();
 			}
 		?>
@@ -1082,6 +1090,28 @@ class Testimonial extends Widget_Base {
 				}
 				?>
 			</div>
+		<?php } ?>
+
+		<?php if('simple-layout' == $settings['eael_testimonial_style']) { ?>
+			<?php $this->render_testimonial_image(); ?>
+			<div class="eael-testimonial-content">
+				<?php
+					if ( 'top' === $settings['eael_testimonial_rating_position'] ) {
+						$this->render_testimonial_rating();
+					}
+				?>
+				<h3 class="eael-testimonial-user"><?php echo wp_kses( $settings['eael_testimonial_name'], HelperClass::eael_allowed_tags() ); ?></h3>
+				<p class="eael-testimonial-user-company"><?php echo wp_kses( $settings['eael_testimonial_company_title'], HelperClass::eael_allowed_tags() ); ?></p>
+				<?php
+				if ( 'default' === $settings['eael_testimonial_rating_position'] ) {
+					$this->render_testimonial_rating();
+				}
+				?>
+				<div class="eael-testimonial-text">
+					<?php echo wp_kses( $settings['eael_testimonial_description'], HelperClass::eael_allowed_tags() ); ?>
+				</div>
+			</div>
+
 		<?php } ?>
 
 		<?php 

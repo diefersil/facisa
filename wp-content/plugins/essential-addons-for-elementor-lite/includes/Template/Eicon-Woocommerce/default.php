@@ -13,9 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 } // Exit if accessed directly
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 $product = wc_get_product( get_the_ID() );
 if ( ! $product ) {
-	error_log( '$product not found in ' . __FILE__ );
 	return;
 }
 
@@ -124,3 +124,4 @@ if ( $should_print_compare_btn ) {
 		'print_compare_button',
 	] );
 }
+// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound

@@ -6,6 +6,11 @@ use \Essential_Addons_Elementor\Classes\Helper;
  *
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+} // Exit if accessed directly
+
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 if ($default_multiple_kb) {
     if(!empty($settings['selected_knowledge_base'])){
         $button_link = str_replace('%knowledge_base%', $settings['selected_knowledge_base'], get_term_link($term->slug, 'doc_category'));
@@ -23,7 +28,7 @@ if ($settings['show_icon']) {
     $cat_icon_id = get_term_meta($term->term_id, 'doc_category_image-id', true);
 
     if ($cat_icon_id) {
-        $cat_icon = wp_get_attachment_image($cat_icon_id, 'thumbnail', true, ['alt' => esc_attr(get_post_meta($cat_icon_id, '_wp_attachment_image_alt', true))]);
+        $cat_icon = wp_get_attachment_image($cat_icon_id, 'thumbnail', true, ['alt' => Helper::get_image_alt(['id' => $cat_icon_id])]);
     } else {
         $cat_icon = '<img src="' . EAEL_PLUGIN_URL . 'assets/front-end/img/betterdocs-cat-icon.svg" alt="betterdocs-category-box-icon">';
     }
@@ -43,3 +48,4 @@ if ($settings['show_count']) {
 
 echo '</div>';
 echo '</a>';
+// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound

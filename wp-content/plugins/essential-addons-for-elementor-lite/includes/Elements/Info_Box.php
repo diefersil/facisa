@@ -17,9 +17,12 @@ use \Elementor\Plugin;
 use \Elementor\Utils;
 use \Elementor\Widget_Base;
 use \Essential_Addons_Elementor\Classes\Helper;
+use Essential_Addons_Elementor\Traits\Helper as HelperTrait;
+use Essential_Addons_Elementor\Controls\EAEL_Gradient_Text;
 
 class Info_Box extends Widget_Base
 {
+    use HelperTrait;
     public function get_name()
     {
         return 'eael-info-box';
@@ -52,6 +55,9 @@ class Info_Box extends Widget_Base
             'card',
             'ea',
             'essential addons',
+            'Glassmorphism',
+            'Liquid Glass Effect',
+            'Frost Effect',
         ];
     }
 
@@ -59,7 +65,14 @@ class Info_Box extends Widget_Base
         if( Plugin::$instance->editor->is_edit_mode() ) {
             return false;
         }
-        $content_type       = $this->get_settings('eael_infobox_text_type');
+
+        $settings = $this->get_data( 'settings' );
+
+        if ( empty( $settings ) || ! is_array( $settings ) ) {
+            return false;
+        }
+
+        $content_type       = sanitize_text_field( $settings['eael_infobox_text_type'] ?? '' );
         $is_dynamic_content = 'template' === $content_type;
 
         return $is_dynamic_content;
@@ -251,7 +264,7 @@ class Info_Box extends Widget_Base
                     'eael_infobox_img_or_icon' => 'number',
                 ],
                 'ai' => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -278,7 +291,7 @@ class Info_Box extends Widget_Base
                 ],
                 'default' => esc_html__('This is an icon box', 'essential-addons-for-elementor-lite'),
                 'ai' => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -306,7 +319,7 @@ class Info_Box extends Widget_Base
 			'eael_infobox_show_sub_title',
 			[
 				'label'        => esc_html__( 'Sub Title', 'essential-addons-for-elementor-lite' ),
-				'type'         => \Elementor\Controls_Manager::SWITCHER,
+				'type'         => Controls_Manager::SWITCHER,
 				'label_on'     => esc_html__( 'Show', 'essential-addons-for-elementor-lite' ),
 				'label_off'    => esc_html__( 'Hide', 'essential-addons-for-elementor-lite' ),
 				'return_value' => 'yes',
@@ -317,7 +330,7 @@ class Info_Box extends Widget_Base
 			'eael_infobox_show_sub_title_after',
 			[
 				'label'   => esc_html__( 'Position', 'essential-addons-for-elementor-lite' ),
-				'type'    => \Elementor\Controls_Manager::CHOOSE,
+				'type'    => Controls_Manager::CHOOSE,
 				'options' => [
 					'column' => [
 						'title' => esc_html__( 'Top', 'essential-addons-for-elementor-lite' ),
@@ -349,7 +362,7 @@ class Info_Box extends Widget_Base
                 ],
                 'default' => esc_html__('This is a sub title', 'essential-addons-for-elementor-lite'),
                 'ai' => [
-					'active' => false,
+					'active' => true,
 				],
                 'condition' => [
                     'eael_infobox_show_sub_title' => 'yes',
@@ -396,10 +409,12 @@ class Info_Box extends Widget_Base
         $this->add_control(
             'eael_primary_templates',
             [
-                'label' => __('Choose Template', 'essential-addons-for-elementor-lite'),
-                'type' => Controls_Manager::SELECT,
-                'options' => Helper::get_elementor_templates(),
-                'condition' => [
+                'label'       => __('Choose Template', 'essential-addons-for-elementor-lite'),
+                'label_block' => true,
+				'type'        => 'eael-select2',
+                'source_name' => 'post_type',
+                'source_type' => 'elementor_library',
+                'condition'   => [
                     'eael_infobox_text_type' => 'template',
                 ],
             ]
@@ -416,7 +431,8 @@ class Info_Box extends Widget_Base
                 'ai' => [
                     'active' => false,
                 ],
-                'default' => __('<p>Write a short description, that will describe the title or something informational and useful.</p>', 'essential-addons-for-elementor-lite'),
+                /* translators: Description text for the default content. HTML <p> tag is added outside. */
+                'default'   => '<p>' . esc_html__( 'Write a short description, that will describe the title or something informational and useful.', 'essential-addons-for-elementor-lite' ) . '</p>',
                 'condition' => [
                     'eael_infobox_text_type' => 'content',
                 ],
@@ -534,6 +550,17 @@ class Info_Box extends Widget_Base
         );
 
         $this->add_control(
+            'eael_wd_liquid_glass_effect_switch',
+            [
+                'label' => __( 'Enable Liquid Glass Effects', 'essential-addons-for-elementor-lite' ),
+                'type'  => Controls_Manager::SWITCHER,
+                'condition' => [
+                    'eael_show_infobox_button' => 'yes',
+                ],
+            ]
+        );
+
+        $this->add_control(
             'eael_show_infobox_clickable',
             [
                 'label' => __('Infobox Clickable', 'essential-addons-for-elementor-lite'),
@@ -583,7 +610,7 @@ class Info_Box extends Widget_Base
                     'eael_show_infobox_button' => 'yes',
                 ],
                 'ai' => [
-					'active' => false,
+					'active' => true,
 				],
             ]
         );
@@ -1718,15 +1745,12 @@ class Info_Box extends Widget_Base
             ]
         );
 
-        $this->add_control(
-            'eael_infobox_title_color',
+        $this->add_group_control(
+            EAEL_Gradient_Text::get_type(),
             [
-                'label' => esc_html__('Color', 'essential-addons-for-elementor-lite'),
-                'type' => Controls_Manager::COLOR,
-                'default' => '#4d4d4d',
-                'selectors' => [
-                    '{{WRAPPER}} .eael-infobox .infobox-content .title' => 'color: {{VALUE}};',
-                ],
+                'name'     => 'eael_infobox_title',
+                'selector' => '{{WRAPPER}} .eael-infobox .infobox-content .title',
+                'default'  => '#4d4d4d',
             ]
         );
 
@@ -1762,15 +1786,12 @@ class Info_Box extends Widget_Base
             ]
         );
 
-        $this->add_control(
-            'eael_infobox_sub_title_color',
+        $this->add_group_control(
+            EAEL_Gradient_Text::get_type(),
             [
-                'label'     => esc_html__('Color', 'essential-addons-for-elementor-lite'),
-                'type'      => Controls_Manager::COLOR,
+                'name'      => 'eael_infobox_sub_title',
+                'selector'  => '{{WRAPPER}} .eael-infobox .infobox-content .sub_title',
                 'default'   => '#4d4d4d',
-                'selectors' => [
-                    '{{WRAPPER}} .eael-infobox .infobox-content .sub_title' => 'color: {{VALUE}};',
-                ],
                 'condition' => [
                     'eael_infobox_show_sub_title' => 'yes',
                 ],
@@ -1889,26 +1910,21 @@ class Info_Box extends Widget_Base
             'label' => esc_html__('Hover', 'essential-addons-for-elementor-lite'),
         ]);
 
-        $this->add_control(
-            'eael_infobox_title_hover_color',
+        $this->add_group_control(
+            EAEL_Gradient_Text::get_type(),
             [
-                'label' => esc_html__('Title Color', 'essential-addons-for-elementor-lite'),
-                'type' => Controls_Manager::COLOR,
-                'default' => '',
-                'selectors' => [
-                    '{{WRAPPER}} .eael-infobox:hover .infobox-content .title' => 'color: {{VALUE}};',
-                ],
+                'name'     => 'eael_infobox_title_hover',
+                'selector' => '{{WRAPPER}} .eael-infobox:hover .infobox-content .title',
+                'default'  => '',
             ]
         );
 
-        $this->add_control(
-            'eael_infobox_sub_title_hover_color',
+        $this->add_group_control(
+            EAEL_Gradient_Text::get_type(),
             [
-                'label'     => esc_html__('Sub Title Color', 'essential-addons-for-elementor-lite'),
-                'type'      => Controls_Manager::COLOR,
-                'selectors' => [
-                    '{{WRAPPER}} .eael-infobox:hover .infobox-content .sub_title' => 'color: {{VALUE}};',
-                ],
+                'name'      => 'eael_infobox_sub_title_hover',
+                'selector'  => '{{WRAPPER}} .eael-infobox:hover .infobox-content .sub_title',
+                'default'   => '',
                 'condition' => [
                     'eael_infobox_show_sub_title' => 'yes',
                 ],
@@ -1949,6 +1965,471 @@ class Info_Box extends Widget_Base
         $this->end_controls_tabs();
 
         $this->end_controls_section();
+
+
+        /**
+         * -------------------------------------------
+         * Tab Style (Liquid Glass Effect)
+         * -------------------------------------------
+         */
+        $this->start_controls_section(
+			'eael_wd_liquid_glass_effect_section',
+			[
+				'label' => esc_html__( 'Liquid Glass Effects', 'essential-addons-for-elementor-lite' ),
+				'tab' => Controls_Manager::TAB_STYLE,
+                'condition' => [
+                    'eael_show_infobox_button' => 'yes',
+                    'eael_wd_liquid_glass_effect_switch' => 'yes',
+                ],
+			]
+		);
+
+        // Liquid Glass Effects
+        $this->eael_liquid_glass_effects();
+
+        //  Liquid Glass Shadow Effects
+        $this->eael_liquid_glass_shadow_effects();
+
+        $this->end_controls_section();
+    }
+
+    /**
+     * Controller Summary of eael_liquid_glass_effects
+     */
+    public function eael_pro_lock_icon() {
+		if ( !apply_filters('eael/pro_enabled', false ) ) {
+			$html = '<span class="e-control-motion-effects-promotion__lock-wrapper"><i class="eicon-lock"></i></span>';
+			return $html;
+		}
+		return;
+	}
+
+    public function eael_teaser_template($texts) {
+		$html = '<div class="ea-nerd-box">
+			<div class="ea-nerd-box-message">' . $texts['messages'] . '</div>
+			<a class="ea-nerd-box-link elementor-button elementor-button-default" href="https://wpdeveloper.com/upgrade/ea-pro" target="_blank">
+			' . __('Upgrade to EA PRO', 'essential-addons-for-elementor-lite') . '
+			</a>
+		</div>';
+
+		return $html;
+    }
+    protected function eael_liquid_glass_effects() {
+
+        $this->add_control(
+            'eael_wd_liquid_glass_effect_notice',
+            [
+                'type'        => Controls_Manager::ALERT,
+                'alert_type'  => 'info',
+                'content'     => esc_html__( 'Liquid glass effect is only visible when a semi-transparent background color is applied.', 'essential-addons-for-elementor-lite' ) . '<a href="https://essential-addons.com/docs/ea-liquid-glass-effects/" target="_blank">' . esc_html__( 'Learn More', 'essential-addons-for-elementor-lite' ) . '</a>',
+                'condition'   => [
+                    'eael_wd_liquid_glass_effect_switch' => 'yes',
+                ]
+            ]
+        );
+
+        $eael_liquid_glass_effect = apply_filters(
+			'eael_liquid_glass_effect_filter',
+			[
+					'styles' => [
+						'effect1' => esc_html__( 'Heavy Frost', 'essential-addons-for-elementor-lite' ),
+						'effect2' => esc_html__( 'Soft Mist', 'essential-addons-for-elementor-lite' ),
+						'effect4' => esc_html__( 'Light Frost', 'essential-addons-for-elementor-lite' ),
+						'effect5' => esc_html__( 'Grain Frost', 'essential-addons-for-elementor-lite' ),
+						'effect6' => esc_html__( 'Fine Frost', 'essential-addons-for-elementor-lite' ),
+				],
+			]
+        );
+        
+        $this->add_control(
+            'eael_wd_liquid_glass_effect',
+            [
+				'label'       => esc_html__( 'Liquid Glass Presets', 'essential-addons-for-elementor-lite' ),
+				'type'        => Controls_Manager::CHOOSE,
+				'label_block' => true,
+				'options'     => [
+					'effect1' => [
+						'title' => esc_html( $eael_liquid_glass_effect['styles']['effect1'] ),
+						'text'  => esc_html( $eael_liquid_glass_effect['styles']['effect1'] ),
+					],
+					'effect2' => [
+						'title' => esc_html( $eael_liquid_glass_effect['styles']['effect2'] ),
+						'text'  => esc_html( $eael_liquid_glass_effect['styles']['effect2'] ),
+					],
+					'effect4' => [
+						'title' => esc_html( $eael_liquid_glass_effect['styles']['effect4'] ),
+						'text'  => esc_html( $eael_liquid_glass_effect['styles']['effect4'] )  . $this->eael_pro_lock_icon(),
+					],
+					'effect5' => [
+						'title' => esc_html( $eael_liquid_glass_effect['styles']['effect5'] ),
+						'text'  => esc_html( $eael_liquid_glass_effect['styles']['effect5'] )  . $this->eael_pro_lock_icon(),
+					],
+					'effect6' => [
+						'title' => esc_html( $eael_liquid_glass_effect['styles']['effect6'] ),
+						'text'  => esc_html( $eael_liquid_glass_effect['styles']['effect6'] )  . $this->eael_pro_lock_icon(),
+					],
+				],
+				'prefix_class' => 'eael_wd_liquid_glass-',
+				'condition' => [
+					'eael_wd_liquid_glass_effect_switch' => 'yes',
+				],
+				'default' => 'effect1',
+				'multiline' => true,
+			]
+        );
+
+        if ( !apply_filters('eael/pro_enabled', false ) ) {
+            $this->add_control(
+				'eael_wd_liquid_glass_effect_pro_alert',
+				[
+					'type' => Controls_Manager::RAW_HTML,
+					'raw'  => $this->eael_teaser_template( [
+						'messages' => __( "To use this Liquid glass preset, Upgrade to Essential Addons Pro", 'essential-addons-for-elementor-lite' ),
+					] ),
+					'condition' => [
+						'eael_wd_liquid_glass_effect_switch' => 'yes',
+						'eael_wd_liquid_glass_effect'        => ['effect4', 'effect5', 'effect6'],
+					]
+				]
+			);
+		} else {
+			$this->add_control(
+				'eael_wd_liquid_glass_effect_settings',
+				[
+					'label'     => esc_html__( 'Liquid Glass Settings', 'essential-addons-for-elementor-lite' ),
+					'type'      => Controls_Manager::HEADING,
+					'separator' => 'before',
+					'condition' => [
+						'eael_wd_liquid_glass_effect_switch' => 'yes',
+					]
+				]
+			);
+		}
+
+        // Background Color Controls
+        $this->eael_wd_liquid_glass_effect_bg_color_effect( $this, 'effect1', '#FFFFFF1F', '.eael-infobox-button' );
+        $this->eael_wd_liquid_glass_effect_bg_color_effect( $this, 'effect2', '#FFFFFF1F', 'eael-infobox-button' );
+        
+        // Liquid Glass Background Color Effects
+        do_action( 'eael_wd_liquid_glass_effect_bg_color_effect4', $this, 'effect4', '#FFFFFF1F', '.eael-infobox-button' );
+        do_action( 'eael_wd_liquid_glass_effect_bg_color_effect5', $this, 'effect5', '#FFFFFF1F', '.eael-infobox-button' );
+        do_action( 'eael_wd_liquid_glass_effect_bg_color_effect6', $this, 'effect6', '#FFFFFF1F', '.eael-infobox-button' );
+
+        // Backdrop Filter Controls
+        $this->eael_wd_liquid_glass_effect_backdrop_filter_effect( $this, 'effect1', '24', '.eael-infobox-button' );
+        $this->eael_wd_liquid_glass_effect_backdrop_filter_effect( $this, 'effect2', '20', '.eael-infobox-button' );
+
+        // Brightness Effect Controls
+		$this->add_control(
+			'eael_wd_liquid_glass_effect_brightness_effect2',
+			[
+				'label' => esc_html__( 'Brightness', 'essential-addons-for-elementor-lite' ),
+				'type'  => Controls_Manager::SLIDER,
+				'range' => [
+					'px' => [
+						'min'  => 0,
+						'max'  => 5,
+						'step' => .1,
+					],
+				],
+				'default' => [
+					'size' => 1,
+				],
+				'selectors' => [
+					'{{WRAPPER}}.eael_wd_liquid_glass-effect2 .eael-infobox-button' => 'backdrop-filter: blur({{eael_wd_liquid_glass_effect_backdrop_filter_effect2.SIZE}}px) brightness({{SIZE}});',
+				],
+				'condition'    => [
+					'eael_wd_liquid_glass_effect_switch' => 'yes',
+					'eael_wd_liquid_glass_effect'        => 'effect2',
+				]
+			]
+		);
+        
+        do_action( 'eael_wd_liquid_glass_effect_backdrop_filter_effect4', $this, 'effect4', '', '.eael-infobox-button' );
+        do_action( 'eael_wd_liquid_glass_effect_backdrop_filter_effect5', $this, 'effect5', '', '.eael-infobox-button' );
+        do_action( 'eael_wd_liquid_glass_effect_backdrop_filter_effect6', $this, 'effect6', '', '.eael-infobox-button' );
+
+        // Noise Distortion Settings (Pro)
+		do_action( 'eael_wd_liquid_glass_effect_noise_action', $this );
+    }
+
+    /**
+     * Summary of eael_liquid_glass_shadow_effects
+     */
+    protected function eael_liquid_glass_shadow_effects() {
+        if ( !apply_filters('eael/pro_enabled', false ) ) {
+            $this->add_control(
+                'eael_wd_liquid_glass_shadow_effect',
+                [
+                    'label'     => esc_html__( 'Shadow Effects', 'essential-addons-for-elementor-lite' ),
+                    'type'      => Controls_Manager::SELECT2,
+                    'default'   => 'effect1',
+                    'separator' => 'before',
+                    'options'   => [
+                        '' 		 => esc_html__( 'None', 'essential-addons-for-elementor-lite' ),
+                        'effect1' => esc_html__( 'Effect 1', 'essential-addons-for-elementor-lite' ),
+                        'effect2' => esc_html__( 'Effect 2', 'essential-addons-for-elementor-lite' ),
+                        'effect3' => esc_html__( 'Effect 3', 'essential-addons-for-elementor-lite' ),
+                        'effect4' => esc_html__( 'Effect 4', 'essential-addons-for-elementor-lite' ),
+                    ],
+                    'prefix_class' => 'eael_wd_liquid_glass_shadow-',
+                    'condition'    => [
+                        'eael_wd_liquid_glass_effect_switch' => 'yes',
+                        'eael_wd_liquid_glass_effect'        => ['effect1', 'effect2'],
+                    ]
+                ]
+            );
+
+            $this->add_control(
+                'eael_wd_liquid_glass_shadow_inner',
+                [
+                    'label'     => esc_html__( 'Shadow Settings', 'essential-addons-for-elementor-lite' ),
+                    'type'      => Controls_Manager::HEADING,
+                    'separator' => 'before',
+                    'condition' => [
+                        'eael_wd_liquid_glass_effect_switch'  => 'yes',
+                        'eael_wd_liquid_glass_shadow_effect!' => '',
+                        'eael_wd_liquid_glass_effect'         => ['effect1', 'effect2'],
+                    ],
+                ]
+            );
+
+            // Liquid Glass Border Effects
+            $this->eael_wd_liquid_glass_border_effect( $this, 'effect1', '#FFFFFF1F', '.eael-infobox-button', ['effect1', 'effect2'] );
+            $this->eael_wd_liquid_glass_border_effect( $this, 'effect2', '#FFFFFF1F', '.eael-infobox-button', ['effect1', 'effect2'] );
+            $this->eael_wd_liquid_glass_border_effect( $this, 'effect3', '#FFFFFF1F', '.eael-infobox-button', ['effect1', 'effect2'] );
+            $this->eael_wd_liquid_glass_border_effect( $this, 'effect4', '#FFFFFF1F', '.eael-infobox-button', ['effect1', 'effect2'] );
+
+            // Liquid Glass Border Radius Effects
+            $this->eael_wd_liquid_glass_border_radius_effect($this, 'effect1', '.eael-infobox-button',
+                [
+                    'top' 	  => 24,
+                    'right'    => 24,
+                    'bottom'   => 24,
+                    'left'     => 24,
+                    'unit'     => 'px',
+                    'isLinked' => true,
+                ],
+                ['effect1', 'effect2']
+            );
+
+            $this->eael_wd_liquid_glass_border_radius_effect($this, 'effect2', '.eael-infobox-button',
+                [
+                    'top' 	  => 16,
+                    'right'    => 16,
+                    'bottom'   => 16,
+                    'left'     => 16,
+                    'unit'     => 'px',
+                    'isLinked' => true,
+                ],
+                ['effect1', 'effect2']
+            );
+
+            $this->eael_wd_liquid_glass_border_radius_effect($this, 'effect3', '.eael-infobox-button',
+                [
+                    'top' 	  => 8,
+                    'bottom'   => 8,
+                    'left'     => 8,
+                    'right'    => 8,
+                    'unit'     => 'px',
+                    'isLinked' => true,
+                ],
+                ['effect1', 'effect2']
+            );
+
+            $this->eael_wd_liquid_glass_border_radius_effect($this, 'effect4', '.eael-infobox-button',
+                [
+                    'top' 	  => 24,
+                    'bottom'   => 24,
+                    'left'     => 24,
+                    'right'    => 24,
+                    'unit'     => 'px',
+                    'isLinked' => true,
+                ],
+                ['effect1', 'effect2']
+            );
+
+            // Liquid Glass Shadow Effects
+            $this->eael_wd_liquid_glass_shadow_effect($this, 'effect1', '.eael-infobox-button',
+                [
+                    'color'      => 'rgba(0,0,0,0.78)',
+                    'horizontal' => 0,
+                    'vertical'   => 19,
+                    'blur'       => 26,
+                    'spread'     => 1,
+                ],
+                ['effect1', 'effect2']
+            );
+
+            $this->eael_wd_liquid_glass_shadow_effect($this, 'effect2', '.eael-infobox-button',
+                [
+                    'color'      => '#383C65',
+                    'horizontal' => 0,
+                    'vertical'   => 0,
+                    'blur'       => 33,
+                    'spread'     => -2,
+                ],
+                ['effect1', 'effect2']
+            );
+
+            $this->eael_wd_liquid_glass_shadow_effect($this, 'effect3', '.eael-infobox-button',
+                [
+                    'color'      => 'rgba(255, 255, 255, 0.4)',
+                    'horizontal' => 1,
+                    'vertical'   => 1,
+                    'blur'       => 10,
+                    'spread'     => 5,
+                ],
+                ['effect1', 'effect2']
+            );
+
+            $this->eael_wd_liquid_glass_shadow_effect($this, 'effect4', '.eael-infobox-button',
+                [
+                    'color'      => '#00000040',
+                    'horizontal' => 0,
+                    'vertical'   => 9,
+                    'blur'       => 21,
+                    'spread'     => 0,
+                ],
+                ['effect1', 'effect2']
+            );
+        } else {
+            $this->add_control(
+                'eael_wd_liquid_glass_shadow_effect',
+                [
+                    'label'     => esc_html__( 'Shadow Effects', 'essential-addons-for-elementor-lite' ),
+                    'type'      => Controls_Manager::SELECT2,
+                    'default'   => 'effect1',
+                    'separator' => 'before',
+                    'options'   => [
+                        '' 		 => esc_html__( 'None', 'essential-addons-for-elementor-lite' ),
+                        'effect1' => esc_html__( 'Effect 1', 'essential-addons-for-elementor-lite' ),
+                        'effect2' => esc_html__( 'Effect 2', 'essential-addons-for-elementor-lite' ),
+                        'effect3' => esc_html__( 'Effect 3', 'essential-addons-for-elementor-lite' ),
+                        'effect4' => esc_html__( 'Effect 4', 'essential-addons-for-elementor-lite' ),
+                    ],
+                    'prefix_class' => 'eael_wd_liquid_glass_shadow-',
+                    'condition'    => [
+                        'eael_wd_liquid_glass_effect_switch' => 'yes',
+                        'eael_wd_liquid_glass_effect'        => ['effect1', 'effect2', 'effect4', 'effect5', 'effect6'],
+                    ]
+                ]
+            );
+
+            $this->add_control(
+                'eael_wd_liquid_glass_shadow_inner',
+                [
+                    'label'     => esc_html__( 'Shadow Settings', 'essential-addons-for-elementor-lite' ),
+                    'type'      => Controls_Manager::HEADING,
+                    'separator' => 'before',
+                    'condition' => [
+                        'eael_wd_liquid_glass_effect_switch'  => 'yes',
+                        'eael_wd_liquid_glass_shadow_effect!' => '',
+                        'eael_wd_liquid_glass_effect'         => ['effect1', 'effect2', 'effect4', 'effect5', 'effect6'],
+                    ],
+                ]
+            );
+
+            // Liquid Glass Border Effects
+            $this->eael_wd_liquid_glass_border_effect( $this, 'effect1', '#FFFFFF1F', '.eael-infobox-button', ['effect1', 'effect2', 'effect4', 'effect5', 'effect6'] );
+            $this->eael_wd_liquid_glass_border_effect( $this, 'effect2', '#FFFFFF1F', '.eael-infobox-button', ['effect1', 'effect2', 'effect4', 'effect5', 'effect6'] );
+            $this->eael_wd_liquid_glass_border_effect( $this, 'effect3', '#FFFFFF1F', '.eael-infobox-button', ['effect1', 'effect2', 'effect4', 'effect5', 'effect6'] );
+            $this->eael_wd_liquid_glass_border_effect( $this, 'effect4', '#FFFFFF1F', '.eael-infobox-button', ['effect1', 'effect2', 'effect4', 'effect5', 'effect6'] );
+
+            // Liquid Glass Border Radius Effects
+            $this->eael_wd_liquid_glass_border_radius_effect($this, 'effect1', '.eael-infobox-button',
+                [
+                    'top' 	  => 24,
+                    'right'    => 24,
+                    'bottom'   => 24,
+                    'left'     => 24,
+                    'unit'     => 'px',
+                    'isLinked' => true,
+                ],
+                ['effect1', 'effect2', 'effect4', 'effect5', 'effect6']
+            );
+
+            $this->eael_wd_liquid_glass_border_radius_effect($this, 'effect2', '.eael-infobox-button',
+                [
+                    'top' 	  => 16,
+                    'right'    => 16,
+                    'bottom'   => 16,
+                    'left'     => 16,
+                    'unit'     => 'px',
+                    'isLinked' => true,
+                ],
+                ['effect1', 'effect2', 'effect4', 'effect5', 'effect6']
+            );
+
+            $this->eael_wd_liquid_glass_border_radius_effect($this, 'effect3', '.eael-infobox-button',
+                [
+                    'top' 	  => 8,
+                    'bottom'   => 8,
+                    'left'     => 8,
+                    'right'    => 8,
+                    'unit'     => 'px',
+                    'isLinked' => true,
+                ],
+                ['effect1', 'effect2', 'effect4', 'effect5', 'effect6']
+            );
+
+            $this->eael_wd_liquid_glass_border_radius_effect($this, 'effect4', '.eael-infobox-button',
+                [
+                    'top' 	  => 24,
+                    'bottom'   => 24,
+                    'left'     => 24,
+                    'right'    => 24,
+                    'unit'     => 'px',
+                    'isLinked' => true,
+                ],
+                ['effect1', 'effect2', 'effect4', 'effect5', 'effect6']
+            );
+
+            // Liquid Glass Shadow Effects
+            $this->eael_wd_liquid_glass_shadow_effect($this, 'effect1', '.eael-infobox-button',
+                [
+                    'color'      => 'rgba(0,0,0,0.78)',
+                    'horizontal' => 0,
+                    'vertical'   => 19,
+                    'blur'       => 26,
+                    'spread'     => 1,
+                ],
+                ['effect1', 'effect2', 'effect4', 'effect5', 'effect6']
+            );
+
+            $this->eael_wd_liquid_glass_shadow_effect($this, 'effect2', '.eael-infobox-button',
+                [
+                    'color'      => '#383C65',
+                    'horizontal' => 0,
+                    'vertical'   => 0,
+                    'blur'       => 33,
+                    'spread'     => -2,
+                ],
+                ['effect1', 'effect2', 'effect4', 'effect5', 'effect6']
+            );
+
+            $this->eael_wd_liquid_glass_shadow_effect($this, 'effect3', '.eael-infobox-button',
+                [
+                    'color'      => 'rgba(255, 255, 255, 0.4)',
+                    'horizontal' => 1,
+                    'vertical'   => 1,
+                    'blur'       => 10,
+                    'spread'     => 5,
+                ],
+                ['effect1', 'effect2', 'effect4', 'effect5', 'effect6']
+            );
+
+            $this->eael_wd_liquid_glass_shadow_effect($this, 'effect4', '.eael-infobox-button',
+                [
+                    'color'      => '#00000040',
+                    'horizontal' => 0,
+                    'vertical'   => 9,
+                    'blur'       => 21,
+                    'spread'     => 0,
+                ],
+                ['effect1', 'effect2', 'effect4', 'effect5', 'effect6']
+            );
+        }
     }
 
 	/**
@@ -2021,6 +2502,7 @@ class Info_Box extends Widget_Base
         }
 
         $infobox_image = $this->get_settings('eael_infobox_image');
+        $infobox_image = Helper::eael_wpml_translate_media( $infobox_image ); // WPML Media Translation compatibility
         $infobox_image_url = Group_Control_Image_Size::get_attachment_image_src($infobox_image['id'], 'thumbnail', $settings);
         if (empty($infobox_image_url)){
 	        $infobox_image_url = $infobox_image['url'];
@@ -2071,7 +2553,7 @@ class Info_Box extends Widget_Base
         <div <?php $this->print_render_attribute_string('infobox_icon'); ?>>
 
             <?php if ('img' == $settings['eael_infobox_img_or_icon']): ?>
-                <img src="<?php echo esc_url($infobox_image_url); ?>" alt="<?php echo esc_attr(get_post_meta($infobox_image['id'], '_wp_attachment_image_alt', true)); ?>">
+                <img src="<?php echo esc_url($infobox_image_url); ?>" alt="<?php echo esc_attr(Helper::get_image_alt( $infobox_image )); ?>">
             <?php endif;?>
 
             <?php if ('icon' == $settings['eael_infobox_img_or_icon']): ?>
@@ -2122,8 +2604,8 @@ class Info_Box extends Widget_Base
                 if ('content' === $settings['eael_infobox_text_type']){
                     if (!empty($settings['eael_infobox_text'])) {
                         echo '<div>';
-                        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-                        echo $this->parse_text_editor( $settings['eael_infobox_text'] );
+                        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped, WordPress.Security.EscapeOutput.OutputNotEscaped
+                        echo $this->parse_text_editor( wp_kses( $settings['eael_infobox_text'], Helper::eael_allowed_tags() ) );
                         echo '</div>';
                     }
                     $this->render_infobox_button();
@@ -2135,12 +2617,16 @@ class Info_Box extends Widget_Base
 
                         // WPML Compatibility
                         if ( ! is_array( $settings['eael_primary_templates'] ) ) {
-                            $settings['eael_primary_templates'] = apply_filters( 'wpml_object_id', $settings['eael_primary_templates'], 'wp_template', true );
+                            $settings['eael_primary_templates'] = apply_filters( 'wpml_object_id', $settings['eael_primary_templates'], 'elementor_library', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
                         }
 
-	                    Helper::eael_onpage_edit_template_markup( get_the_ID(), $settings['eael_primary_templates'] );
-                        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-                        echo Plugin::$instance->frontend->get_builder_content( $settings['eael_primary_templates'], true );
+	                    // Re-validate the translated template is a published elementor_library post before rendering.
+	                    if ( Helper::is_elementor_publish_template( $settings['eael_primary_templates'] ) ) {
+		                    Helper::eael_onpage_edit_template_markup( get_the_ID(), $settings['eael_primary_templates'] );
+
+		                    // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		                    echo Plugin::$instance->frontend->get_builder_content( $settings['eael_primary_templates'], true );
+	                    }
 	                    if ( Plugin::$instance->editor->is_edit_mode() ) {
 		                    echo '</div>';
 	                    }
@@ -2177,10 +2663,11 @@ class Info_Box extends Widget_Base
         ?>
         <div class="infobox-button">
             <a <?php $this->print_render_attribute_string('infobox_button'); ?>>
+                <?php do_action( 'eael_wd_liquid_glass_effect_svg_pro', $this, $settings, '.eael-infobox-button' ); ?>
                 <?php if ('left' == $settings['eael_infobox_button_icon_alignment']): ?>
                     <?php if ($button_icon_is_new || $button_icon_migrated) {?>
                         <?php if (isset($settings['eael_infobox_button_icon_new']['value']['url'])) {?>
-                            <img class="eael_infobox_button_icon_left" src="<?php echo esc_url( $settings['eael_infobox_button_icon_new']['value']['url'] ); ?>" alt="<?php echo esc_attr(get_post_meta($settings['eael_infobox_button_icon_new']['value']['id'], '_wp_attachment_image_alt', true)); ?>" />
+                            <img class="eael_infobox_button_icon_left" src="<?php echo esc_url( $settings['eael_infobox_button_icon_new']['value']['url'] ); ?>" alt="<?php echo esc_attr(Helper::get_image_alt( $settings['eael_infobox_button_icon_new']['value'] )); ?>" />
                         <?php } else {
                             Icons_Manager::render_icon( $settings['eael_infobox_button_icon_new'], [ 'aria-hidden' => 'true', 'class' => 'eael_infobox_button_icon_left' ] );
                         }?>
@@ -2192,7 +2679,7 @@ class Info_Box extends Widget_Base
                 <?php if ('right' == $settings['eael_infobox_button_icon_alignment']): ?>
                     <?php if ($button_icon_is_new || $button_icon_migrated) {?>
                         <?php if (isset($settings['eael_infobox_button_icon_new']['value']['url'])) {?>
-                            <img class="eael_infobox_button_icon_right" src="<?php echo esc_url( $settings['eael_infobox_button_icon_new']['value']['url'] ); ?>" alt="<?php echo esc_attr(get_post_meta($settings['eael_infobox_button_icon_new']['value']['id'], '_wp_attachment_image_alt', true)); ?>" />
+                            <img class="eael_infobox_button_icon_right" src="<?php echo esc_url( $settings['eael_infobox_button_icon_new']['value']['url'] ); ?>" alt="<?php echo esc_attr(Helper::get_image_alt( $settings['eael_infobox_button_icon_new']['value'] )); ?>" />
                         <?php } else {
                             Icons_Manager::render_icon( $settings['eael_infobox_button_icon_new'], [ 'aria-hidden' => 'true', 'class' => 'eael_infobox_button_icon_right' ] );
                         }?>

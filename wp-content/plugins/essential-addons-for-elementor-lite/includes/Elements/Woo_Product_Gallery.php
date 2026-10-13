@@ -147,6 +147,7 @@ class Woo_Product_Gallery extends Widget_Base {
 		$this->init_content_product_settings_controls();
 		$this->eael_product_badges();
 		$this->init_content_load_more_controls();
+		$this->eael_product_view_popup_controls();
 
 		// Style Controls---------------
 		$this->init_style_gallery_controls();
@@ -311,7 +312,7 @@ class Woo_Product_Gallery extends Widget_Base {
 					'eael_woo_product_gallery_terms_show_all' => 'yes',
 				],
 				'ai' => [
-					'active' => false,
+					'active' => true,
 				],
 			]
 		);
@@ -900,11 +901,50 @@ class Woo_Product_Gallery extends Widget_Base {
 				'show_load_more' => [ 'yes', '1', 'true' ],
 			],
 			'ai' => [
-				'active' => false,
+				'active' => true,
 			],
 		] );
 
 		$this->end_controls_section(); # end of section 'Load More'
+	}
+
+	protected function eael_product_view_popup_controls() {
+		$this->start_controls_section(
+			'eael_product_quick_view_popup_controls',
+			[
+				'label'     => __( 'Popup', 'essential-addons-for-elementor-lite' ),
+				'condition' => [
+					'eael_product_gallery_quick_view'    => 'yes',
+					'eael_product_gallery_style_preset!' => [
+						'eael-product-preset-4',
+					],
+				],
+			]
+		);
+
+		$this->add_control(
+			'eael_product_quick_view_hide_categories',
+			[
+				'label'        => esc_html__( 'Category', 'essential-addons-for-elementor-lite' ),
+				'type'         => Controls_Manager::SWITCHER,
+				'label_on'     => esc_html__( 'Hide', 'essential-addons-for-elementor-lite' ),
+				'label_off'    => esc_html__( 'Show', 'essential-addons-for-elementor-lite' ),
+				'return_value' => 'yes',
+			]
+		);
+
+		$this->add_control(
+			'eael_product_quick_view_hide_quantity',
+			[
+				'label'        => esc_html__( 'Quantity Input', 'essential-addons-for-elementor-lite' ),
+				'type'         => Controls_Manager::SWITCHER,
+				'label_on'     => esc_html__( 'Hide', 'essential-addons-for-elementor-lite' ),
+				'label_off'    => esc_html__( 'Show', 'essential-addons-for-elementor-lite' ),
+				'return_value' => 'yes',
+			]
+		);
+
+		$this->end_controls_section();
 	}
 
 	protected function init_style_product_controls() {
@@ -1924,7 +1964,7 @@ class Woo_Product_Gallery extends Widget_Base {
 				'type'      => Controls_Manager::TEXT,
 				'separator' => 'before',
 				'ai' => [
-					'active' => false,
+					'active' => true,
 				],
 			]
 		);
@@ -1934,7 +1974,7 @@ class Woo_Product_Gallery extends Widget_Base {
 				'label' => esc_html__( 'Stock Out Text', 'essential-addons-for-elementor-lite' ),
 				'type'  => Controls_Manager::TEXT,
 				'ai' => [
-					'active' => false,
+					'active' => true,
 				],
 			]
 		);
@@ -2794,7 +2834,7 @@ class Woo_Product_Gallery extends Widget_Base {
 		$settings[ 'eael_widget_id' ] = $widget_id;
 		$is_product_archive = is_product_tag() || is_product_category() || is_shop() || is_product_taxonomy();
 
-		if ( $settings[ 'post_type' ] === 'source_dynamic' && is_archive() || !empty( $_REQUEST[ 'post_type' ] ) ) {
+		if ( $settings[ 'post_type' ] === 'source_dynamic' && is_archive() || !empty( $_REQUEST[ 'post_type' ] ) ) { //phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			$settings[ 'posts_per_page' ] = $settings[ 'eael_product_gallery_products_count' ] ?: 3;
 			$settings[ 'offset' ]         = $settings[ 'product_offset' ];
 			$args                         = HelperClass::get_query_args( $settings );
@@ -2829,7 +2869,7 @@ class Woo_Product_Gallery extends Widget_Base {
             if (  in_array( $product_purchase_type, ['purchased', 'not-purchased'] ) ) {
                 $user_ordered_products = HelperClass::eael_get_all_user_ordered_products();
                 $no_products_found = empty( $user_ordered_products ) && 'purchased' === $product_purchase_type ? 1 : 0;
- 
+
                 if ( ! empty( $user_ordered_products ) && 'purchased' === $product_purchase_type ){
                     $args['post__in'] = $user_ordered_products;
                 }
@@ -2843,11 +2883,7 @@ class Woo_Product_Gallery extends Widget_Base {
 		?>
 
         <div <?php $this->print_render_attribute_string( 'wrap' ); ?> >
-			<?php
-
-			$this->eael_product_terms_render( $settings, $args );
-
-			?>
+			<?php $this->eael_product_terms_render( $settings, $args ); ?>
 
             <div class="woocommerce">
 				<?php
@@ -2871,11 +2907,15 @@ class Woo_Product_Gallery extends Widget_Base {
 					if( $settings['post_type'] === 'archive' && is_archive() && $is_product_archive ){
                         global $wp_query;
                         $query = $wp_query;
-                        $args  = $wp_query->query_vars;
+                        $found_posts = $query->found_posts;
+                        $max_page = $query->max_num_pages;
+                        // The first page is rendered from the real main query above, but Load More
+                        // must not inherit its raw query_vars — see build_archive_load_more_args().
+                        $args  = $this->build_archive_load_more_args( $wp_query );
                     } else {
 	                    $query = new \WP_Query( $args );
                     }
-
+					
 					$this->add_render_attribute( 'eael-post-appender', 'class', 'products eael-post-appender eael-post-appender-' . $this->get_id() );
 					$this->add_render_attribute( 'eael-post-appender', 'data-layout-mode', $settings["eael_product_gallery_items_layout"] );
 
@@ -2893,20 +2933,26 @@ class Woo_Product_Gallery extends Widget_Base {
 					$this->add_render_attribute( 'eael-post-appender', 'data-ssi-desktop', $show_secondary_image ? 'yes' : 'no' );
 
 					echo '<ul '; $this->print_render_attribute_string( 'eael-post-appender' ); echo ' >';
+
 					if ( $query->have_posts() ) {
 						$found_posts         = $query->found_posts - $offset;
 						$max_page            = ceil( $found_posts / absint( $args['posts_per_page'] ) );
 						$args['max_page']    = $max_page;
 						$args['found_posts'] = $query->found_posts;
-
+						
+						do_action( 'eael_woo_before_product_loop' );
 						while ( $query->have_posts() ) {
 							$query->the_post();
+
 							include( $template );
 						}
+
+						do_action( 'eael_woo_after_product_loop' );
 						wp_reset_postdata();
 					} else {
 						echo '<h2 class="eael-product-not-found">' . esc_html__( 'No Product Found', 'essential-addons-for-elementor-lite' ) . '</h2>';
 					}
+
 					echo '</ul>';
 					do_action( 'eael_woo_after_product_loop' );
 
@@ -2928,12 +2974,7 @@ class Woo_Product_Gallery extends Widget_Base {
 
 				if ($layout_mode === 'masonry') {
 					// init isotope
-					var $isotope_products = $products.isotope({
-						                                          itemSelector: "li.product",
-						                                          layoutMode: $layout_mode,
-						                                          percentPosition: true
-					                                          });
-
+					var $isotope_products = $products.isotope({ itemSelector: "li.product", layoutMode: $layout_mode, percentPosition: true });
 					$isotope_products.imagesLoaded().progress(function () {
 						$isotope_products.isotope('layout');
 					})
@@ -2948,10 +2989,189 @@ class Woo_Product_Gallery extends Widget_Base {
 	}
 
 	/**
-	 * build_product_query
-	 * @param $settings
-	 * @return array
+	 * Build a clean, self-contained query for Load More / Infinity Scroll when the
+	 * widget is sourced from the current WooCommerce archive.
+	 *
+	 * The archive branch of render() draws page one straight from the main query, but
+	 * its raw `query_vars` must never be serialized into `data-args`: WP fills 50+
+	 * defaults there as empty strings (`menu_order`, `hour`, `minute`, `second`,
+	 * `post_parent`, …). Round-tripping those through the Load More request turns them
+	 * into integer `0`, and WP_Query treats `0` as a real filter — the page-two query
+	 * ends up with `menu_order = 0 AND DATE_FORMAT( post_date, '%H.%i%s' ) = 0` in its
+	 * WHERE clause, which matches nothing, so the loader reports "No posts found!" and
+	 * infinity scroll halts after the first page.
+	 *
+	 * Only what the archive actually needs is rebuilt here: the product post type, the
+	 * page size, the catalog ordering, WooCommerce's visibility exclusions and the
+	 * archive's own term / search phrase.
+	 *
+	 * @since 6.7.4
+	 *
+	 * @param \WP_Query $query The current archive main query.
+	 *
+	 * @return array WP_Query arguments that are safe to serialize into `data-args`.
 	 */
+	protected function build_archive_load_more_args( $query ) {
+		$posts_per_page = (int) $query->get( 'posts_per_page' );
+
+		if ( $posts_per_page < 1 ) {
+			$posts_per_page = (int) apply_filters( 'loop_shop_per_page', 12 ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce core filter.
+		}
+
+		$args = [
+			'post_type'      => 'product',
+			'post_status'    => 'publish',
+			'posts_per_page' => $posts_per_page,
+			'offset'         => 0,
+		];
+
+		// Catalog ordering as WooCommerce resolved it for this archive.
+		$orderby  = $query->get( 'orderby' );
+		$order    = $query->get( 'order' );
+		$meta_key = $query->get( 'meta_key' );
+
+		if ( ! empty( $order ) ) {
+			$args['order'] = $order;
+		}
+
+		if ( ! empty( $meta_key ) ) {
+			$args['meta_key'] = $meta_key;
+		}
+
+		// price / popularity / rating are not WP_Query orderby values — WooCommerce
+		// implements them with `posts_clauses` filters that only attach to the archive's
+		// own main query. Copying the raw token into a plain WP_Query would silently
+		// degrade to date order, so page two would re-serve products the visitor already
+		// scrolled past. Hand it to ajax_load_more() instead, which re-applies the real
+		// WooCommerce ordering for the Load More query.
+		if ( in_array( $orderby, [ 'price', 'popularity', 'rating' ], true ) ) {
+			$args['eael_wc_catalog_orderby'] = $orderby;
+		} elseif ( ! empty( $orderby ) ) {
+			$args['orderby'] = $orderby;
+		}
+
+		// Keep WooCommerce's catalog visibility exclusions (hidden / out-of-stock terms).
+		$tax_query      = [];
+		$main_tax_query = $query->get( 'tax_query' );
+
+		if ( $main_tax_query instanceof \WP_Tax_Query ) {
+			$main_tax_query = $main_tax_query->queries;
+		}
+
+		if ( is_array( $main_tax_query ) ) {
+			foreach ( $main_tax_query as $key => $clause ) {
+				if ( 'relation' === $key || ! is_array( $clause ) ) {
+					continue;
+				}
+
+				if ( isset( $clause['taxonomy'] ) && 'product_visibility' === $clause['taxonomy'] ) {
+					$tax_query[] = $clause;
+				}
+			}
+		}
+
+		// The archive term itself — the main query derives it from a rewrite var
+		// (product_cat / product_tag / attribute), which is not portable to AJAX.
+		$queried_object = $query->get_queried_object();
+
+		if ( $queried_object instanceof \WP_Term && ! empty( $queried_object->taxonomy ) ) {
+			$tax_query[] = [
+				'taxonomy' => $queried_object->taxonomy,
+				'field'    => 'term_id',
+				'terms'    => [ (int) $queried_object->term_id ],
+			];
+		}
+
+		if ( ! empty( $tax_query ) ) {
+			$tax_query['relation'] = 'AND';
+			$args['tax_query']     = $tax_query;
+		}
+
+		$search = $query->get( 's' );
+
+		if ( ! empty( $search ) ) {
+			$args['s'] = $search;
+		}
+
+		/**
+		 * Filters the Load More query built for a Woo Product Gallery archive.
+		 *
+		 * @since 6.7.4
+		 *
+		 * @param array     $args  WP_Query arguments serialized into `data-args`.
+		 * @param \WP_Query $query The current archive main query.
+		 */
+		return apply_filters( 'eael/woo-product-gallery/archive_load_more_args', $args, $query );
+	}
+
+	/**
+	 * Convert WP_Query arguments to WC_Product_Query arguments
+	 * @param array $wp_args Original WP_Query arguments
+	 * @param array $settings Widget settings
+	 * @return array WC_Product_Query compatible arguments
+	 */
+	private function convert_wp_query_args_to_wc_product_query( $wp_args, $settings = [] ) {
+		$wc_args = [
+			'paginate' => true,
+			'return' => 'objects',
+			'visibility' => 'visible'
+		];
+
+		// Parameter mapping
+		$arg_mapping = [
+			'posts_per_page' => 'limit',
+			'post_status' => 'status',
+			'post__in' => 'include',
+			'post__not_in' => 'exclude',
+			'author__in' => 'author',
+			'paged' => 'page',
+		];
+
+		foreach ( $arg_mapping as $wp_key => $wc_key ) {
+			if ( isset( $wp_args[ $wp_key ] ) ) {
+				$wc_args[ $wc_key ] = $wp_args[ $wp_key ];
+			}
+		}
+
+		// Handle other parameters
+		$direct_copy = [ 'orderby', 'order', 'offset' ];
+		foreach ( $direct_copy as $key ) {
+			if ( isset( $wp_args[ $key ] ) ) {
+				$wc_args[ $key ] = $wp_args[ $key ];
+			}
+		}
+
+		// Handle search
+		if ( isset( $wp_args['s'] ) ) {
+			$wc_args['search'] = $wp_args['s'];
+		}
+
+		// Preserve complex queries
+		if ( isset( $wp_args['meta_query'] ) ) {
+			$wc_args['meta_query'] = $wp_args['meta_query'];
+		}
+		if ( isset( $wp_args['tax_query'] ) ) {
+			$wc_args['tax_query'] = $wp_args['tax_query'];
+		}
+
+		// Handle meta_key/meta_value
+		if ( isset( $wp_args['meta_key'] ) ) {
+			if ( ! isset( $wc_args['meta_query'] ) ) {
+				$wc_args['meta_query'] = [ 'relation' => 'AND' ];
+			}
+			$meta_query = [ 'key' => $wp_args['meta_key'] ];
+			if ( isset( $wp_args['meta_value'] ) ) {
+				$meta_query['value'] = $wp_args['meta_value'];
+			}
+			if ( isset( $wp_args['meta_compare'] ) ) {
+				$meta_query['compare'] = $wp_args['meta_compare'];
+			}
+			$wc_args['meta_query'][] = $meta_query;
+		}
+
+		return $wc_args;
+	}
+
 	public function build_product_query( $settings ) {
 		$get_product_cats = $settings[ 'eael_product_gallery_categories' ] ?: '';
 		$product_cats     = ! empty( $get_product_cats ) ? str_replace( ' ', '', $get_product_cats ) : '';
@@ -2966,6 +3186,7 @@ class Woo_Product_Gallery extends Widget_Base {
 			'include'    => $product_cats,
 			'orderby'    => 'include',
 		);
+		// phpcs:ignore WordPress.WP.DeprecatedParameters.Get_termsParam2Found
 		$product_categories = get_terms( 'product_cat', $cat_args );
 
 		// Tag retrieve
@@ -2975,11 +3196,12 @@ class Woo_Product_Gallery extends Widget_Base {
 			'include'    => $product_tags_items,
 			'orderby'    => 'include',
 		);
+		// phpcs:ignore WordPress.WP.DeprecatedParameters.Get_termsParam2Found
 		$product_tags = get_terms( 'product_tag', $tag_args );
 		
 		$args = [
 			'post_type'      => 'product',
-			'post_status'    => array( 'publish', 'pending', 'future' ),
+			'post_status'    => 'publish',
 			'posts_per_page' => $settings[ 'eael_product_gallery_products_count' ] ?: 4,
 			'order'          => ( isset( $settings[ 'order' ] ) ? $settings[ 'order' ] : 'desc' ),
 			'offset'         => $settings[ 'product_offset' ],
@@ -3180,6 +3402,7 @@ class Woo_Product_Gallery extends Widget_Base {
 				$all_taxonomy = 'product_tag';
 			}
 
+			$settings['eael_all_tab_thumb'] = HelperClass::eael_wpml_translate_media( $settings['eael_all_tab_thumb'] ); // WPML Media Translation compatibility
 			if ( $show_cat_thumb && !empty($settings['eael_all_tab_thumb']['url'])) {
 				$show_all_cat_thumb = '<img src="' . esc_url( $settings['eael_all_tab_thumb']['url'] ) . '" />';
 			} else {
@@ -3206,6 +3429,7 @@ class Woo_Product_Gallery extends Widget_Base {
 				'include'    => $product_cats,
 				'orderby'    => 'include',
 			);
+			// phpcs:ignore WordPress.WP.DeprecatedParameters.Get_termsParam2Found
 			$product_categories = get_terms( 'product_cat', $catargs );
 
 			if ( count( $product_categories ) > 0 ) {
@@ -3236,6 +3460,7 @@ class Woo_Product_Gallery extends Widget_Base {
 				'include'    => $product_tags_items,
 				'orderby'    => 'include',
 			);
+			// phpcs:ignore WordPress.WP.DeprecatedParameters.Get_termsParam2Found
 			$product_tags = get_terms( 'product_tag', $tagargs );
 
 			if ( count( $product_tags ) > 0 ) {

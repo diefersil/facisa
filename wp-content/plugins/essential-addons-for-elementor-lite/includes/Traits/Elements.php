@@ -21,6 +21,7 @@ trait Elements {
 		if ( version_compare( ELEMENTOR_VERSION, '3.5.0', '>=' ) ) {
 			$controls_manager->register( new \Essential_Addons_Elementor\Controls\Select2() );
 			$controls_manager->add_group_control( 'eael-background', new \Essential_Addons_Elementor\Controls\EAEL_Background() );
+			$controls_manager->add_group_control( 'eael-gradient-text', new \Essential_Addons_Elementor\Controls\EAEL_Gradient_Text() );
 			$controls_manager->register( new \Essential_Addons_Elementor\Controls\EAEL_Choose() );
 		} else {
 			$controls_manager->register_control( 'eael-select2', new \Essential_Addons_Elementor\Controls\Select2() );
@@ -72,7 +73,7 @@ trait Elements {
 				}
 			}
 
-			if ( $this->pro_enabled && \version_compare( EAEL_PRO_PLUGIN_VERSION, '3.3.0', '<' ) ) {
+			if ( $this->pro_enabled && defined( 'EAEL_PRO_PLUGIN_VERSION' ) && \version_compare( EAEL_PRO_PLUGIN_VERSION, '3.3.0', '<' ) ) {
 				if ( in_array( $active_element, [
 					'content-timeline',
 					'dynamic-filter-gallery',
@@ -368,6 +369,12 @@ trait Elements {
 				'categories' => '["essential-addons-elementor"]',
 			],
 			[
+				'name'       => 'pricing-slider',
+				'title'      => __( 'Pricing Slider', 'essential-addons-for-elementor-lite' ),
+				'icon'       => 'eaicon-pricing-slider',
+				'categories' => '["essential-addons-elementor"]',
+			],
+			[
 				'name'       => 'sphere-photo-viewer',
 				'title'      => __( '360 Degree Photo Viewer', 'essential-addons-for-elementor-lite' ),
 				'icon'       => 'eaicon-photo-sphere',
@@ -376,6 +383,10 @@ trait Elements {
 		] );
 
 		$config['promotionWidgets'] = $combine_array;
+
+		if ( isset( $config['promotion']['elements']['action_button'] ) && empty( $config['promotion']['elements']['action_button']['url'] ) ) {
+			$config['promotion']['elements']['action_button']['url'] = 'https://wpdeveloper.com/upgrade/ea-pro';
+		}
 
 		return $config;
 	}
@@ -438,7 +449,7 @@ trait Elements {
 			$post_id = get_option('page_for_posts');
 		}
 		
-		if ( $this->get_settings( 'reading-progress' ) || $this->get_settings( 'table-of-content' ) || $this->get_settings( 'scroll-to-top' ) ) {
+		if ( $this->get_settings( 'reading-progress' ) || $this->get_settings( 'table-of-content' ) || $this->get_settings( 'scroll-to-top' ) || $this->get_settings( 'custom-cursor' ) ) {
 			$html            = '';
 			$global_settings = get_option( 'eael_global_settings' );
 
@@ -482,11 +493,11 @@ trait Elements {
 				$reading_progress_html = '<div id="eael-reading-progress-'. get_the_ID() .'" class="eael-reading-progress-wrap eael-reading-progress-wrap-' . ( $this->get_extensions_value( 'eael_ext_reading_progress' ) == 'yes' ? 'local' : 'global' ) . '">';
 
 				if ( $global_reading_progress ) {
-					$reading_progress_html .= '<div class="eael-reading-progress eael-reading-progress-global eael-reading-progress-' . $this->get_extensions_value( 'eael_ext_reading_progress_position' ) . '" style="height: ' . esc_attr( $progress_height ) . 'px;background-color: ' . $this->get_extensions_value( 'eael_ext_reading_progress_bg_color' ) . ';">
-                        <div class="eael-reading-progress-fill" style="height: ' . esc_attr( $progress_height ) . 'px;background-color: ' . $this->get_extensions_value( 'eael_ext_reading_progress_fill_color' ) . ';transition: width ' . esc_attr( $animation_speed ) . 'ms ease;"></div>
+					$reading_progress_html .= '<div class="eael-reading-progress eael-reading-progress-global eael-reading-progress-' . esc_attr( $this->get_extensions_value( 'eael_ext_reading_progress_position' ) ) . '" style="height: ' . esc_attr( $progress_height ) . 'px;background-color: ' . esc_attr( $this->get_extensions_value( 'eael_ext_reading_progress_bg_color' ) ) . ';">
+                        <div class="eael-reading-progress-fill" style="height: ' . esc_attr( $progress_height ) . 'px;background-color: ' . esc_attr( $this->get_extensions_value( 'eael_ext_reading_progress_fill_color' ) ) . ';transition: width ' . esc_attr( $animation_speed ) . 'ms ease;"></div>
                     </div>';
 				} else {
-					$reading_progress_html .= '<div class="eael-reading-progress eael-reading-progress-local eael-reading-progress-' . $this->get_extensions_value( 'eael_ext_reading_progress_position' ) . '">
+					$reading_progress_html .= '<div class="eael-reading-progress eael-reading-progress-local eael-reading-progress-' . esc_attr( $this->get_extensions_value( 'eael_ext_reading_progress_position' ) ) . '">
                         <div class="eael-reading-progress-fill"></div>
                     </div>';
 				}
@@ -546,7 +557,8 @@ trait Elements {
 				$position                        = $settings_data['eael_ext_toc_position'];
 				$is_mobile_on                    = isset( $settings_data['eael_ext_toc_position_mobile'] ) ? $settings_data['eael_ext_toc_position_mobile'] : 'no';
 				$mobile_position                 = isset( $settings_data['eael_ext_toc_position_mobile_top_bottom'] ) ? $settings_data['eael_ext_toc_position_mobile_top_bottom'] : $position;
-				$page_offset                     = ! empty( $settings_data['eael_ext_toc_main_page_offset'] ) ? $settings_data['eael_ext_toc_main_page_offset']['size'] : 0;
+				$page_offset                     = ! empty( $settings_data['eael_ext_toc_main_page_offset'] ) ? $settings_data['eael_ext_toc_main_page_offset']['size'] : 120;
+				$page_offset					 = $page_offset = max(5, min(2000, $page_offset));
 				$close_bt_text_style             = $settings_data['eael_ext_toc_close_button_text_style'];
 				$auto_collapse                   = $settings_data['eael_ext_toc_auto_collapse'];
 				$auto_highlight                  = ! empty( $settings_data['eael_ext_toc_auto_highlight'] ) ? $settings_data['eael_ext_toc_auto_highlight'] : '';
@@ -573,12 +585,15 @@ trait Elements {
 					$el_class .= ( 'top' === $mobile_position ) ? ' eael-toc-top' : ' eael-toc-bottom';
 				}
 
+				$scroll_sync                     = ! empty( $settings_data['eael_ext_toc_scroll_sync'] ) ? $settings_data['eael_ext_toc_scroll_sync'] : '';
+
 				$toc_style_class = ' eael-toc-list-' . $toc_style;
 				$toc_style_class .= ( $toc_collapse == 'yes' ) ? ' eael-toc-collapse' : ' ';
 				$toc_style_class .= ( $list_icon == 'number' ) ? ' eael-toc-number' : ' eael-toc-bullet';
 				$toc_style_class .= ( $toc_word_wrap == 'yes' ) ? ' eael-toc-word-wrap' : ' ';
 				$toc_style_class .= ( $auto_highlight == 'yes' ) ? ' eael-toc-auto-highlight' : ' ';
 				$toc_style_class .= ( $auto_highlight == 'yes' && $auto_highlight_single_item_only == 'yes' ) ? ' eael-toc-highlight-single-item' : ' ';
+				$toc_style_class .= ( $auto_highlight == 'yes' && $scroll_sync == 'yes' ) ? ' eael-toc-scroll-sync' : ' ';
 				$title_url       = ( $title_to_url == 'yes' ) ? 'true' : 'false';
 				$icon_html       = ! empty( $icon_check['value'] ) ? "<i class='" . esc_attr( $icon_check['value'] ) . "'></i>" : '';
 
@@ -689,6 +704,11 @@ trait Elements {
 				}
 			}
 		}
+
+		//Custom Cursor
+		if ( $this->get_settings( 'custom-cursor' ) == true ) {
+			do_action( 'eael/custom_cursor/page_render', $document, $global_settings );
+		}
 		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		printf( '%1$s', $html );
 	}
@@ -699,8 +719,25 @@ trait Elements {
 	 *
 	 * @return string|void
 	 */
+	/**
+	 * Recursively strip characters that could break out of an inline
+	 * <style> block from every string leaf of a settings array before it
+	 * is interpolated into raw CSS.
+	 */
+	private function sanitize_css_settings_array( $settings ) {
+		if ( ! is_array( $settings ) ) {
+			return Helper::eael_sanitize_css_value( $settings );
+		}
+
+		foreach ( $settings as $key => $value ) {
+			$settings[ $key ] = $this->sanitize_css_settings_array( $value );
+		}
+
+		return $settings;
+	}
+
 	public function toc_global_css( $global_settings ) {
-		$eael_toc                 = $global_settings['eael_ext_table_of_content'];
+		$eael_toc                 = $this->sanitize_css_settings_array( $global_settings['eael_ext_table_of_content'] );
 		$eael_toc_width           = isset( $eael_toc['eael_ext_toc_width']['size'] ) ? $eael_toc['eael_ext_toc_width']['size'] : 300;
 		$toc_list_color_active    = $eael_toc['eael_ext_table_of_content_list_text_color_active'];
 		$toc_list_separator_style = $eael_toc['eael_ext_table_of_content_list_separator_style'];
@@ -911,7 +948,7 @@ trait Elements {
 	 * @return string|void
 	 */
 	public function progress_bar_local_css( $document_settings ) {
-		$eael_reading_progress_fill_color = Helper::eael_fetch_color_or_global_color($document_settings, 'eael_ext_reading_progress_fill_color');
+		$eael_reading_progress_fill_color = Helper::eael_sanitize_css_value( Helper::eael_fetch_color_or_global_color($document_settings, 'eael_ext_reading_progress_fill_color') );
 
 		$reading_progress_local_css = '';
 		$eael_reading_progress_id_selector = '#eael-reading-progress-' . get_the_ID();
@@ -937,7 +974,7 @@ trait Elements {
 			return false;
 		}
 
-		$eael_scroll_to_top            = $global_settings['eael_ext_scroll_to_top'];
+		$eael_scroll_to_top            = $this->sanitize_css_settings_array( $global_settings['eael_ext_scroll_to_top'] );
 		$eael_stt_position             = $eael_scroll_to_top['eael_ext_scroll_to_top_position_text'];
 		$eael_stt_position_bottom_size = isset( $eael_scroll_to_top['eael_ext_scroll_to_top_position_bottom']['size'] ) ? $eael_scroll_to_top['eael_ext_scroll_to_top_position_bottom']['size'] : 5;
 		$eael_stt_position_bottom_unit = isset( $eael_scroll_to_top['eael_ext_scroll_to_top_position_bottom']['unit'] ) ? $eael_scroll_to_top['eael_ext_scroll_to_top_position_bottom']['unit'] : 'px';
@@ -958,8 +995,8 @@ trait Elements {
 		$eael_stt_button_icon_size_unit     = isset( $eael_scroll_to_top['eael_ext_scroll_to_top_button_icon_size']['unit'] ) ? $eael_scroll_to_top['eael_ext_scroll_to_top_button_icon_size']['unit'] : 'px';
 		$eael_stt_button_icon_svg_size_size = isset( $eael_scroll_to_top['eael_ext_scroll_to_top_button_icon_svg_size']['size'] ) ? $eael_scroll_to_top['eael_ext_scroll_to_top_button_icon_svg_size']['size'] : 32;
 		$eael_stt_button_icon_svg_size_unit = isset( $eael_scroll_to_top['eael_ext_scroll_to_top_button_icon_svg_size']['unit'] ) ? $eael_scroll_to_top['eael_ext_scroll_to_top_button_icon_svg_size']['unit'] : 'px';
-		$eael_stt_button_icon_color         = $eael_scroll_to_top['eael_ext_scroll_to_top_button_icon_color'];
-		$eael_stt_button_bg_color           = $eael_scroll_to_top['eael_ext_scroll_to_top_button_bg_color'];
+		$eael_stt_button_icon_color         = Helper::eael_sanitize_css_value( $eael_scroll_to_top['eael_ext_scroll_to_top_button_icon_color'] );
+		$eael_stt_button_bg_color           = Helper::eael_sanitize_css_value( $eael_scroll_to_top['eael_ext_scroll_to_top_button_bg_color'] );
 		$eael_stt_button_border_radius_size = isset( $eael_scroll_to_top['eael_ext_scroll_to_top_button_border_radius']['size'] ) ? $eael_scroll_to_top['eael_ext_scroll_to_top_button_border_radius']['size'] : 5;
 		$eael_stt_button_border_radius_unit = isset( $eael_scroll_to_top['eael_ext_scroll_to_top_button_border_radius']['unit'] ) ? $eael_scroll_to_top['eael_ext_scroll_to_top_button_border_radius']['unit'] : 'px';
 
@@ -1015,7 +1052,7 @@ trait Elements {
         if( count( Helper::get_eael_advanced_accordion_faq() )) : ?>
             <!-- EA FAQ Schema : Starts-->
             <script type="application/ld+json">
-                <?php echo json_encode( Helper::get_eael_advanced_accordion_faq() ); ?>
+                <?php echo wp_json_encode( Helper::get_eael_advanced_accordion_faq(), JSON_UNESCAPED_UNICODE ); ?>
             </script>
             <!-- EA FAQ Schema : Ends-->
         <?php endif;

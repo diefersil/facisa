@@ -370,8 +370,8 @@ class Post_Grid extends Widget_Base
             [
                 'label'       => esc_html__('Expansion Indicator', 'essential-addons-for-elementor-lite'),
                 'type'        => Controls_Manager::TEXT,
-                'dynamic'     => [ 'active'      =>true ],
-                'ai'          => [ 'active'      =>false ],
+                'dynamic'     => [ 'active'      => true ],
+                'ai'          => [ 'active'      => true ],
                 'label_block' => false,
                 'default'     => esc_html__('...', 'essential-addons-for-elementor-lite'),
                 'condition'   => [
@@ -406,7 +406,7 @@ class Post_Grid extends Widget_Base
             [
                 'label'       => esc_html__('Text', 'essential-addons-for-elementor-lite'),
                 'type'        => Controls_Manager::TEXT,
-                'ai'          => [ 'active' => false ],
+                'ai'          => [ 'active' => true ],
                 'label_block' => false,
                 'default'     => esc_html__('Read More', 'essential-addons-for-elementor-lite'),
                 'condition'   => [
@@ -524,8 +524,8 @@ class Post_Grid extends Widget_Base
                 'label'       => esc_html__( 'Terms Separator', 'essential-addons-for-elementor-lite' ),
                 'type'        => Controls_Manager::TEXT,
                 'label_block' => false,
-                'ai'          => [ 'active' => false ],
-                'default'     => esc_html__( '', 'essential-addons-for-elementor-lite' ),
+                'ai'          => [ 'active' => true ],
+                'default'     => '',
                 'condition'   => [
                     'eael_show_post_terms'        => 'yes',
                     'eael_post_grid_preset_style' =>  ['two', 'three'],
@@ -1827,8 +1827,9 @@ class Post_Grid extends Widget_Base
         $offset = $settings['offset'] ? absint( $settings['offset'] ) : 0;
         $posts_per_page = isset($args['posts_per_page']) && $args['posts_per_page'] > 0 ? $args['posts_per_page'] : -1 ;
 
-        set_transient( 'eael_post_grid_read_more_button_text_'. $this->get_id(), $this->get_settings_for_display('read_more_button_text'), DAY_IN_SECONDS );
-        set_transient( 'eael_post_grid_excerpt_expanison_indicator_'. $this->get_id(), $this->get_settings_for_display('excerpt_expanison_indicator'), DAY_IN_SECONDS );
+        $eael_lang_suffix = HelperClass::eael_lang_suffix();
+        set_transient( 'eael_post_grid_read_more_button_text_'. $this->get_id() . $eael_lang_suffix, $this->get_settings_for_display('read_more_button_text'), DAY_IN_SECONDS );
+        set_transient( 'eael_post_grid_excerpt_expanison_indicator_'. $this->get_id() . $eael_lang_suffix, $this->get_settings_for_display('excerpt_expanison_indicator'), DAY_IN_SECONDS );
         $settings['read_more_button_text'] = $this->get_settings_for_display('read_more_button_text');
         $settings['excerpt_expanison_indicator'] = $this->get_settings_for_display('excerpt_expanison_indicator');
 

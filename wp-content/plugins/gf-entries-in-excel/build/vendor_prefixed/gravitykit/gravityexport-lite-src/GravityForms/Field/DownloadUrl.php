@@ -5,7 +5,6 @@ namespace GFExcel\GravityForms\Field;
 use GFExcel\Action\DownloadUrlDisableAction;
 use GFExcel\Action\DownloadUrlEnableAction;
 use GFExcel\Action\DownloadUrlResetAction;
-use GFExcel\GFExcel;
 use Gravity_Forms\Gravity_Forms\Settings\Fields\Text;
 
 /**
@@ -31,6 +30,13 @@ class DownloadUrl extends Text {
 	 * @since 2.0.0
 	 */
 	public $readonly = 'readonly';
+
+	/**
+	 * The url for the download form.
+	 * @since 2.4.0
+	 * @var string
+	 */
+	public $url = '';
 
 	/**
 	 * @inheritdoc
@@ -94,7 +100,8 @@ class DownloadUrl extends Text {
 	 * @since 2.0.0
 	 */
 	public function get_value() {
-		if ( ! $hash = parent::get_value() ) {
+		$hash = $this->default_value ?: parent::get_value();
+		if ( ! $hash ) {
 			return '';
 		}
 
@@ -103,16 +110,7 @@ class DownloadUrl extends Text {
 			return $hash;
 		}
 
-		$permalink = '/index.php?' . GFExcel::KEY_ACTION . '=%s&' . GFExcel::KEY_HASH . '=%s';
-		$action    = GFExcel::$slug;
-
-		if ( get_option( 'permalink_structure' ) ) {
-			$permalink = '/%s/%s';
-		} else {
-			$hash = urlencode( $hash );
-		}
-
-		return $blog_url . sprintf( $permalink, $action, $hash );
+		return $this->url;
 	}
 
 	/**
@@ -150,10 +148,15 @@ $script = <<<JS
 })(jQuery);
 JS;
 
+		// A field instantiated without `assets_dir` (e.g. the "Activate GravityExport"
+		// section) must not emit a relative src: WordPress concatenates it straight
+		// onto site_url(), producing a malformed `<host>js/clipboard.js` request.
+		$assets_dir = $this->assets_dir ?: plugin_dir_url( GFEXCEL_PLUGIN_FILE ) . 'public/';
+
 		return [
 			[
 				'handle'   => 'gk-gravityexport-clipboard-js',
-				'src'      => $this->assets_dir . 'js/clipboard.js',
+				'src'      => $assets_dir . 'js/clipboard.js',
 				'callback' => function () use ( $script ) {
 					wp_add_inline_script(
 						'gk-gravityexport-clipboard-js',

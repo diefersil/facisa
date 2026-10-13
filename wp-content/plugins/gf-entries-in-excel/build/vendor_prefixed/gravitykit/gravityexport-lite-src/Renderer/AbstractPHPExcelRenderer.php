@@ -13,6 +13,7 @@ use GFExcel\Values\BaseValue;
 use GFExcel\Values\NumericValue;
 use GFForms;
 use GFExcel\Vendor\PhpOffice\PhpSpreadsheet\Cell\Cell;
+use GFExcel\Vendor\PhpOffice\PhpSpreadsheet\RichText\RichText;
 use GFExcel\Vendor\PhpOffice\PhpSpreadsheet\Spreadsheet;
 use GFExcel\Vendor\PhpOffice\PhpSpreadsheet\Style\Border;
 use GFExcel\Vendor\PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -97,10 +98,39 @@ abstract class AbstractPHPExcelRenderer extends AbstractRenderer implements Rend
 
             if ($objWriter instanceof Csv) {
                 $this->setCsvProperties($objWriter);
+                $this->escapeCsvFormulas($objWriter);
             }
 
             if ($save) {
-                $file = get_temp_dir() . $this->getFileName();
+                $default_path = get_temp_dir() . $this->getFileName();
+
+                /**
+                 * Modifies the path the rendered export file is saved to.
+                 *
+                 * Applies to every saved render: notification attachments, scheduled and bulk exports.
+                 * A file saved for a notification attachment is deleted right after its email is sent.
+                 *
+                 * @since 2.7.0
+                 *
+                 * @param string $file The full path to save the file to. Default: the temp directory plus the export file name.
+                 * @param array  $form The form object. Can be empty for renders without a form context.
+                 */
+                $file = gf_apply_filters(
+                    ['gk/gravityexport/renderer/save-path', (int) \rgar($this->form, 'id', 0)],
+                    $default_path,
+                    $this->form
+                );
+
+                if (!is_string($file) || $file === '') {
+                    $file = $default_path;
+                }
+
+                // An unwritable target falls back to the default: save() would throw, and this
+                // class handles that by printing an error page and exiting the request.
+                if (!is_writable(file_exists($file) ? $file : dirname($file))) {
+                    $file = $default_path;
+                }
+
                 $objWriter->save($file);
 
                 return $file;
@@ -110,6 +140,8 @@ abstract class AbstractPHPExcelRenderer extends AbstractRenderer implements Rend
                 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             } elseif ($extension === 'csv') {
                 header('Content-Type: text/csv');
+            } elseif ($extension === 'pdf') {
+                header('Content-Type: application/pdf');
             }
 
             header('Content-Disposition: attachment;filename="' . $this->getFileName() . '"');
@@ -319,12 +351,51 @@ abstract class AbstractPHPExcelRenderer extends AbstractRenderer implements Rend
     }
 
     /**
+     * Whether the current visitor may see the technical details of a failure.
+     *
+     * Paths, versions and stack traces are useful to whoever maintains the site and to nobody else, so an
+     * anonymous visitor gets a plain message instead.
+     *
+     * @since 2.7.3
+     *
+     * @return bool Whether to show the details.
+     */
+    private static function can_see_diagnostics(): bool
+    {
+        // Debug constants say how a site reports errors, not who may read them, so they do not open this up.
+        return \GFCommon::current_user_can_any('gravityforms_export_entries');
+    }
+
+    /**
      * Helper method to handle an exception.
      * @param \Throwable|\Exception $exception
      */
     private function handleException($exception): void
     {
 	    global $wp_version;
+
+	    error_log( sprintf(
+		    'GravityExport Lite: %s in %s:%d. %s',
+		    $exception->getMessage(),
+		    $exception->getFile(),
+		    $exception->getLine(),
+		    $exception->getTraceAsString()
+	    ) );
+
+	    if ( ! self::can_see_diagnostics() ) {
+		    /* translators: placeholders in [brackets] are replaced and must not be translated. */
+		    $message = esc_html__(
+			    'The export could not be created. The reason was written to the server\'s error log. If you do not manage this site, please report this to [site].',
+			    'gk-gravityexport-lite'
+		    );
+
+		    echo wpautop(
+			    '<h3>' . esc_html__( 'GravityExport Lite: Something is broken', 'gk-gravityexport-lite' ) . '</h3>'
+			    . strtr( $message, [ '[site]' => esc_html( get_bloginfo( 'name' ) ) ] )
+		    );
+
+		    exit;
+	    }
 
 	    $output = [];
 
@@ -492,5 +563,94 @@ abstract class AbstractPHPExcelRenderer extends AbstractRenderer implements Rend
 			$objWriter->getOutputEncoding(),
 			$form_id
 		) );
+	}
+
+	/**
+	 * Prefixes every CSV text cell that a spreadsheet app would run as a formula with a single quote.
+	 *
+	 * A CSV file cannot mark a cell as text, so a visitor's `=HYPERLINK(...)` would run when the file is opened.
+	 *
+	 * @since TBD
+	 *
+	 * @param Csv $objWriter The CSV writer.
+	 */
+	private function escapeCsvFormulas( Csv $objWriter ): void {
+		$form_id = (int) \rgar( $this->form, 'id', 0 );
+
+		/**
+		 * Whether to prefix CSV cells that start with a formula character with a single quote.
+		 *
+		 * Text cells that start with `=`, `+`, `-`, `@` (after any spaces), a tab or a line break get the prefix,
+		 * following the OWASP guidance on CSV injection. Plain numbers like `-5` are never prefixed.
+		 *
+		 * @since TBD
+		 *
+		 * @param bool  $escape Whether to prefix formula cells. Default: true.
+		 * @param array $form   The form object.
+		 */
+		$escape = gf_apply_filters(
+			[ 'gk/gravityexport/renderer/csv/escape-formulas', $form_id ],
+			true,
+			$this->form
+		);
+
+		if ( ! $escape ) {
+			return;
+		}
+
+		// Without an enclosure, a delimiter inside a value would start a new cell that is never checked.
+		if ( ! $objWriter->getEnclosure() ) {
+			$objWriter->setEnclosure( '"' );
+		}
+
+		$worksheet = $this->spreadsheet->getSheet( $objWriter->getSheetIndex() );
+
+		foreach ( $worksheet->getCellCollection()->getCoordinates() as $coordinate ) {
+			$cell  = $worksheet->getCell( $coordinate );
+			$value = $cell->getValue();
+
+			if ( $value instanceof RichText ) {
+				$value = $value->getPlainText();
+			}
+
+			// Numbers and booleans are written as they are, whatever type the cell claims to have.
+			if ( ! is_string( $value ) ) {
+				continue;
+			}
+
+			$escaped = self::escapeCsvValue( $value );
+
+			if ( $escaped === $value ) {
+				continue;
+			}
+
+			$cell->setValueExplicit( $escaped, DataType::TYPE_STRING );
+		}
+	}
+
+	/**
+	 * Returns a CSV value with a single quote in front when a spreadsheet app would run it as a formula.
+	 *
+	 * @since TBD
+	 *
+	 * @param string $value The cell value.
+	 *
+	 * @return string The value, with a single quote in front when it starts like a formula.
+	 */
+	public static function escapeCsvValue( string $value ): string {
+		// LibreOffice ignores NUL bytes, so a leading one must not hide the first character.
+		$trimmed = ltrim( $value, " \0" );
+
+		// A plain number such as -5 or +31 is data, and prefixing it would turn it into text.
+		if ( '' === $trimmed || is_numeric( trim( $value ) ) ) {
+			return $value;
+		}
+
+		// PhpSpreadsheet stores a carriage return as a line feed, so both are listed.
+		if ( ! in_array( $trimmed[0], [ '=', '+', '-', '@', "\t", "\r", "\n" ], true ) ) {
+			return $value;
+		}
+
+		return "'" . $value;
 	}
 }

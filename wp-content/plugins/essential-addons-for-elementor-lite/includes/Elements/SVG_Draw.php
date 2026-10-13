@@ -596,7 +596,7 @@ class SVG_Draw extends Widget_Base {
 
 	protected function render() {
 		$settings = $this->get_settings_for_display();
-		$svg_html = isset( $settings['svg_html'] ) ? preg_replace( ['#<script(.*?)>(.*?)</script>#is', '#<script(.*?)>(.*?)</script#is'], '', $settings['svg_html'] ) : '';
+		$svg_html = isset( $settings['svg_html'] ) ? wp_kses( $settings['svg_html'], Helper::eael_allowed_svg_draw_tags() ) : '';
 		$this->add_render_attribute( 'eael-svg-drow-wrapper', [
 			'class' => [
 				'eael-svg-draw-container',
@@ -618,7 +618,9 @@ class SVG_Draw extends Widget_Base {
 			'excludeStyle' => esc_attr( $settings['eael_svg_exclude_style'] ),
 			'transition'   => esc_attr( $settings['eael_svg_fill_transition'] ),
 			'stroke_length' => $settings['eael_svg_stroke_dash_adjustment']['size'] ?? '100',
-			'ease_type'    => $settings['eael_svg_animation_type'] ?? 'none'
+			'ease_type'    => $settings['eael_svg_animation_type'] ?? 'none',
+			'has_pro' 	   => apply_filters( 'eael/pro_enabled', false )
+
 		];
 
 		if ( ! empty( $settings['eael_svg_drawing_speed'] ) ) {

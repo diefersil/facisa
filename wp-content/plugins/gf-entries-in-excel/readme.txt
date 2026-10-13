@@ -2,10 +2,10 @@
 Contributors: gravityview, doekenorg
 Donate link: https://www.gravitykit.com/extensions/gravityexport/?utm_source=plugin&utm_campaign=gravityexport-lite&utm_content=readme-donate
 Tags: Gravity Forms, GravityForms, Excel, Export, Entries
-Requires at least: 4.0
-Requires PHP: 7.2
-Tested up to: 6.7
-Stable tag: 2.3.9
+Requires at least: 6.5
+Requires PHP: 7.4.0
+Tested up to: 7.1.2
+Stable tag: 2.7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,13 +50,13 @@ Save time generating exports in Gravity Forms: Configure the fields that are inc
 
 ### Documentation & support
 
-If you have any questions regarding GravityExport Lite, [check out our documentation](https://docs.gravitykit.com/category/791-gravityexport?utm_source=plugin&utm_campaign=gravityexport-lite&utm_content=readme-checkout-docs).
+If you have any questions regarding GravityExport Lite, [check out our documentation](https://www.gravitykit.com/docs/gravityexport/?utm_source=plugin&utm_campaign=gravityexport-lite&utm_content=readme-checkout-docs).
 
 If you need further assistance, [read this first](https://wordpress.org/support/topic/read-me-first-9/) and our support team will gladly give you a helping hand!
 
 #### Requirements
 
-* PHP 7.2
+* PHP 7.4
 * `php-xml` and `php-zip` libraries. The plugin will check for those.
 * Gravity Forms 2.5 or higher
 
@@ -255,6 +255,90 @@ You can hide a row by adding a hook. Checkout this example:
 3. Or download it from the list via the bulk selector
 
 == Changelog ==
+
+= 2.7.4 on October 3, 2026 =
+
+**Note: GravityExport Lite now requires WordPress 6.5 or newer.**
+
+* Security: Field values starting with characters such as `=` could be interpreted as formulas when a CSV export was opened in a spreadsheet application. These values now begin with a single quote (`'`) so they display as plain text, while regular numbers such as `-5` are left unchanged (thanks to Ali Hidayat for the report).
+* Fixed: Download links created by other GravityExport add-ons could return a "not found" error when a GravityExport Lite feed's settings happened to contain the same security key. These links now work correctly.
+
+__Developer Updates:__
+* Added: `gk/gravityexport/renderer/csv/escape-formulas` filter to turn off formula escaping in CSV exports (useful when CSV files are imported into other systems rather than opened in a spreadsheet application).
+
+= 2.7.3 on September 18, 2026 =
+
+* Security: On some sites, a request to the download URL that carried no security key returned a form's entries to a visitor who was not logged in. Thanks to Ashish Agarwal for the report.
+* Security: Disabling a form's download URL did not always stop downloads, because a request that carried no security key was still served.
+* Security: When an export failed, the error page showed server file paths, a stack trace and the plugin, Gravity Forms, PHP and WordPress versions to visitors.
+* Fixed: A download URL could return "not found" when another add-on's settings happened to contain the same security key.
+* Fixed: A file extension added to the end of a download URL was used as-is, so an export could be returned in a file format the plugin does not offer. Unsupported extensions now fall back to the file type configured for the form.
+* Fixed: A malformed download URL could trigger a PHP fatal error on the site. Malformed URLs are now rejected.
+
+= 2.7.2 on September 17, 2026 =
+
+**Note: GravityExport Lite now requires PHP 7.4 or newer.**
+
+* Fixed: PDF exports were not sent with a PDF file type, which could cause browsers, proxies and file previewers to handle the downloaded file incorrectly.
+* Fixed: A browser console error appeared on a form's GravityExport Lite settings page before a download URL was enabled.
+
+= 2.7.1 on August 14, 2026 =
+
+* Fixed: Sites running PHP 8.4 or newer logged repeated "deprecated" warnings on every page.
+* Fixed: The global settings page was hidden for administrators when the Members plugin managed capabilities. The page now requires the "Export Entries" capability, which can be granted per role.
+
+= 2.7.0 on August 6, 2026 =
+
+* Added: The single-entry export attached to a notification is now saved to a unique temporary folder, so simultaneous submissions can no longer overwrite each other's attachment.
+* Fixed: Copy-to-clipboard button icons were vertically misaligned in WordPress 7.0.
+* Fixed: A "translation loading triggered too early" notice (WordPress 6.7+) caused by the download-URL feed actions loading translations during plugin bootstrap.
+* Fixed: The success message shown after regenerating, enabling, or disabling a download URL was lost because the page redirected before it could display.
+
+__Developer Updates:__
+* Added: `gk/gravityexport/notification/attachment-ids` filter to change the notification IDs the single-entry export is attached to.
+* Added: `gk/gravityexport/notification/attachment-source-ids` filter to replace the stored notification selection; it runs first, so callbacks on the filter above always receive the complete selection (used by GravityExport to attach the export to multiple notifications).
+* Added: `gk/gravityexport/renderer/save-path` filter to change the path a rendered export file is saved to.
+* Added: `gk/gravityexport/feed/pre-save-settings` filter to change the feed settings before they are stored; it runs inside the save, so related settings are written in a single update.
+
+= 2.6.0 on March 26, 2026 =
+
+* Added: `gk/gravityexport/fields/additional-meta-fields` filter to customize the additional meta fields available for export.
+* Fixed: "Date Updated" values were displayed in GMT instead of the local time.
+
+__Developer Updates:__
+* Please note that the `gravitykit/gravityexport-lite` package on Packagist has been abandoned and is no longer maintained.
+
+= 2.5.0 on January 29, 2026 =
+
+* Added: A search field for the Enabled and Disabled Fields lists on the form settings page. Quickly find fields by name when configuring exports for forms with many fields.
+* Enhancement: Accessibility support for the field selector:
+  - Screen reader announcements when fields are moved between lists;
+  - Keyboard navigation with Enter/Space to move fields and Escape to clear search;
+  - Visible focus indicators for keyboard users;
+  - Proper ARIA labels on all interactive elements.
+* Enhancement: RTL (right-to-left) language support for the field selector interface.
+* Enhancement: Added filter hooks change the separator used to combine complex fields, like Name and Address.
+* Fixed: PHP warning when field names are used as regex patterns without proper delimiters.
+
+__Developer Updates:__
+
+* Added: `gfexcel_field_separated_separator` filter to change the default separator for all combined subfields (default: newline).
+* Added: `gfexcel_field_{field_type}_separator` filter (e.g., `gfexcel_field_name_separator`) to change the separator for a specific field type.
+
+= 2.4.2 on January 7, 2026 =
+
+* Fixed: Added a deterministic sort order to prevent missing and duplicate entries.
+* Fixed: Entries without a `payment_date` value would show the current date/time instead of an empty value.
+* Change: Release process to WordPress.org from GitHub Actions.
+
+= 2.4.1 on August 28, 2025 =
+
+* Enhancement: Added support for defining a `GFEXCEL_AVOID_CLASS_ALIAS` constant as `true` to prevent registering PhpSpreadsheet class aliases.
+
+= 2.4.0 on July 10, 2025 =
+
+* Changed: Updated download link handling to allow future enhancements.
+* Enhancement: Entries can now be ordered by "Date Updated".
 
 = 2.3.9 on May 5, 2025 =
 

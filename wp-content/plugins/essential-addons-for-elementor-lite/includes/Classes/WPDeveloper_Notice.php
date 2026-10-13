@@ -142,8 +142,9 @@ class WPDeveloper_Notice {
         add_action( 'wpdeveloper_after_upsale_notice_for_' . $this->plugin_name, array( $this, 'after' ) );
         add_action( $this->do_notice_action, array( $this, 'content' ) );
         // if( current_user_can( 'install_plugins' ) ) {
-            if( isset( $_GET['plugin'] ) &&  $_GET['plugin'] == $this->plugin_name ) {
-                do_action( 'wpdeveloper_notice_clicked_for_' . $this->plugin_name );
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            if( isset( $_GET['plugin'] ) &&  sanitize_text_field( wp_unslash( $_GET['plugin'] ) ) == $this->plugin_name ) {
+                do_action( 'wpdeveloper_notice_clicked_for_' . $this->plugin_name ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
                 /**
                  * Redirect User To the Current URL, but without set query arguments.
                  */
@@ -244,7 +245,7 @@ class WPDeveloper_Notice {
      * @return integer
      */
     public function makeTime( $current, $time ) {
-	    return intval( strtotime( date( 'Y-m-d h:i:s', intval( $current ) ) . " +$time" ) );
+	    return intval( strtotime( gmdate( 'Y-m-d h:i:s', intval( $current ) ) . " +$time" ) );
     }
     /**
      * Automatice Maybe Later.
@@ -264,19 +265,28 @@ class WPDeveloper_Notice {
      * @return void
      */
     public function clicked(){
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         if( isset( $_GET['plugin'] ) ) {
-            $plugin = sanitize_text_field( $_GET['plugin'] );
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $plugin = sanitize_text_field( wp_unslash( $_GET['plugin'] ) );
             if( $plugin === $this->plugin_name ) {
                 $options_data = $this->get_options_data();
+                // phpcs:ignore WordPress.Security.NonceVerification.Recommended
                 $clicked_from = current( $this->next_notice() );
+                // phpcs:ignore WordPress.Security.NonceVerification.Recommended
                 if( isset( $_GET['plugin_action'] ) ) {
-                    $plugin_action = sanitize_text_field( $_GET['plugin_action'] );
+                    // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+                    $plugin_action = sanitize_text_field( wp_unslash( $_GET['plugin_action'] ) );
                 }
+                // phpcs:ignore WordPress.Security.NonceVerification.Recommended
                 if( isset( $_GET['dismiss'] ) ) {
-                    $dismiss = sanitize_text_field( $_GET['dismiss'] );
+                    // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+                    $dismiss = sanitize_text_field( wp_unslash( $_GET['dismiss'] ) );
                 }
+                // phpcs:ignore WordPress.Security.NonceVerification.Recommended
                 if( isset( $_GET['later'] ) ) {
-                    $later = sanitize_text_field( $_GET['later'] );
+                    // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+                    $later = sanitize_text_field( wp_unslash( $_GET['later'] ) );
                 }
 
                 $later_time = '';
@@ -325,8 +335,8 @@ class WPDeveloper_Notice {
      * @return void
      */
     private function redirect_to(){
-        $request_uri  = parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH );
-        $query_string = parse_url( $_SERVER['REQUEST_URI'], PHP_URL_QUERY );
+        $request_uri  = !empty( $_SERVER['REQUEST_URI'] ) ? wp_parse_url( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_PATH ) : '';
+        $query_string = !empty( $_SERVER['REQUEST_URI'] ) ? wp_parse_url( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ), PHP_URL_QUERY ) : '';
 	    wp_parse_str( $query_string, $current_url );
 
         $unset_array = array( 'dismiss', 'plugin', '_wpnonce', 'later', 'plugin_action', 'marketing_optin' );
@@ -377,17 +387,17 @@ class WPDeveloper_Notice {
 
         switch( $notice ) {
             case 'opt_in' :
-                do_action('wpdeveloper_optin_notice_for_' . $this->plugin_name );
+                do_action('wpdeveloper_optin_notice_for_' . $this->plugin_name ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
                 break;
             case 'first_install' :
                 if( $options_data[ $this->plugin_name ]['first_install'] !== 'deactivated' ) {
-                    do_action( 'wpdeveloper_first_install_notice_for_' . $this->plugin_name );
+                    do_action( 'wpdeveloper_first_install_notice_for_' . $this->plugin_name ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
                     $this->get_thumbnail( 'first_install' );
                     $this->get_message( 'first_install' );
                 }
                 break;
             case 'update' :
-                do_action( 'wpdeveloper_update_notice_for_' . $this->plugin_name );
+                do_action( 'wpdeveloper_update_notice_for_' . $this->plugin_name ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
                 $this->dismiss_button_scripts();
                 $this->get_thumbnail( 'update' );
                 $this->get_message( 'update' );
@@ -399,7 +409,7 @@ class WPDeveloper_Notice {
             //     $this->get_message( 'update_400k' );
             //     break;
             case 'review' :
-                do_action( 'wpdeveloper_review_notice_for_' . $this->plugin_name );
+                do_action( 'wpdeveloper_review_notice_for_' . $this->plugin_name ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
                 $this->get_thumbnail( 'review' );
                 $this->get_message( 'review' );
                 break;
@@ -420,11 +430,11 @@ class WPDeveloper_Notice {
      * Upsale Notice
      */
     public function upsale_notice(){
-        do_action( 'wpdeveloper_before_upsale_notice_for_' . $this->plugin_name );
-            do_action('wpdeveloper_upsale_notice_for_' . $this->plugin_name);
+        do_action( 'wpdeveloper_before_upsale_notice_for_' . $this->plugin_name ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
+            do_action('wpdeveloper_upsale_notice_for_' . $this->plugin_name); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
             $this->get_thumbnail( 'upsale' );
             $this->get_message( 'upsale' );
-        do_action( 'wpdeveloper_after_upsale_notice_for_' . $this->plugin_name );
+        do_action( 'wpdeveloper_after_upsale_notice_for_' . $this->plugin_name ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
         $this->upsale_button_script();
     }
     /**
@@ -548,11 +558,15 @@ class WPDeveloper_Notice {
             return;
         }
         if( $current_notice == 'opt_in' ) {
+            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound
             do_action( $this->do_notice_action );
             return;
-        }
+        } 
+        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
         do_action( 'wpdeveloper_before_notice_for_' . $this->plugin_name );
-            do_action( $this->do_notice_action );
+        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound
+        do_action( $this->do_notice_action );
+        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Shared WPDeveloper notice hook; renaming would break existing listeners.
         do_action( 'wpdeveloper_after_notice_for_' . $this->plugin_name );
     }
     /**
@@ -787,8 +801,8 @@ class WPDeveloper_Notice {
             return;
         }
 
-        $dismiss = isset( $_POST['dismiss'] ) ? sanitize_text_field( $_POST['dismiss'] ) : false;
-        $notice = isset( $_POST['notice'] ) ? sanitize_text_field( $_POST['notice'] ) : false;
+        $dismiss = isset( $_POST['dismiss'] ) ? sanitize_text_field( wp_unslash( $_POST['dismiss'] ) ) : false;
+        $notice = isset( $_POST['notice'] ) ? sanitize_text_field( wp_unslash( $_POST['notice'] ) ) : false;
         if( $dismiss ) {
             $this->update( $notice );
             update_user_meta( get_current_user_id(), $this->plugin_name . '_' . $notice, true );
@@ -813,7 +827,7 @@ class WPDeveloper_Notice {
             return;
         }
 
-        $dismiss = isset( $_POST['dismiss'] ) ? sanitize_text_field( $_POST['dismiss'] ) : false;
+        $dismiss = isset( $_POST['dismiss'] ) ? sanitize_text_field( wp_unslash( $_POST['dismiss'] ) ) : false;
         if( $dismiss ) {
             $this->update( 'upsale' );
             echo 'success';

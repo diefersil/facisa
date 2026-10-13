@@ -2,6 +2,8 @@
 
 namespace GFExcel;
 
+use GF_Query;
+use GF_Query_Column;
 use GFExcel\Field\FieldInterface;
 use GFExcel\Repository\FieldsRepository;
 use GFExcel\Repository\FormsRepository;
@@ -275,6 +277,10 @@ class GFExcelOutput
 			    $this->feed_id
 		    );
 
+			// Clear the meta cache for late meta field registration.
+		    global $_entry_meta;
+		    unset( $_entry_meta[ $this->form_id ] );
+
 		    // prevent a multi-k database query to build up the array.
 		    $loop = true;
 		    while ( $loop ) {
@@ -294,9 +300,12 @@ class GFExcelOutput
 				    $paging
 			    );
 
+				if ( is_null( $new_entries ) || $new_entries === $this->form_id ) {
+				    $query = new GF_Query( $this->form_id, $search_criteria, $sorting, $paging );
 
-			    if ( is_null( $new_entries ) || $new_entries === $this->form_id ) {
-				    $new_entries = \GFAPI::get_entries( $this->form_id, $search_criteria, $sorting, $paging );
+					// Ensure a repeatable unique order.
+				    $query->order( new GF_Query_Column( 'id' ), 'DESC' );
+					$new_entries = $query->get();
 			    }
 
 			    $count = count( $new_entries );

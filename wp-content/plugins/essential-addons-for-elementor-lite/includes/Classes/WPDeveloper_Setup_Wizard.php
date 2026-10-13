@@ -48,7 +48,7 @@ class WPDeveloper_Setup_Wizard {
 	 * Remove all notice in setup wizard page
 	 */
 	public function remove_notice() {
-		if ( isset( $_GET[ 'page' ] ) && $_GET[ 'page' ] == 'eael-setup-wizard' ) {
+		if ( isset( $_GET[ 'page' ] ) && $_GET[ 'page' ] == 'eael-setup-wizard' ) { //phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
 			remove_all_actions( 'admin_notices' );
 			remove_all_actions( 'all_admin_notices' );
 		}
@@ -69,7 +69,7 @@ class WPDeveloper_Setup_Wizard {
 			// wp_enqueue_script( 'essential_addons_elementor-setup-wizard-js', EAEL_PLUGIN_URL . 'assets/admin/js/admin.js', array( 'jquery' ), EAEL_PLUGIN_VERSION, true );
 			// wp_enqueue_script( 'essential_addons_elementor-setup-wizard-react-css', EAEL_PLUGIN_URL . 'includes/templates/admin/quick-setup/dist/quick-setup.min.css', array(), EAEL_PLUGIN_VERSION, true );
 			wp_enqueue_script( 'essential_addons_elementor-setup-wizard-react-js', EAEL_PLUGIN_URL . 'includes/templates/admin/quick-setup/dist/quick-setup.min.js', array(), EAEL_PLUGIN_VERSION, true );
-			
+
 			wp_localize_script( 'essential_addons_elementor-setup-wizard-react-js', 'localize', array(
 				'ajaxurl'       => esc_url( admin_url( 'admin-ajax.php' ) ),
 				'nonce'         => wp_create_nonce( 'essential-addons-elementor' ),
@@ -114,6 +114,7 @@ class WPDeveloper_Setup_Wizard {
 			'configuration_content' => $this->data_configuration_content(),
 			'elements_content' => $this->data_elements_content(),
 			'go_pro_content' => $this->data_go_pro_content(),
+			'thinkrank_content' => $this->data_thinkrank_content(),
 			'plugins_content' => $this->data_plugins_content(),
 			'integrations_content' => $this->data_integrations_content(),
 			'modal_content' => $this->data_modal_content(),
@@ -128,6 +129,7 @@ class WPDeveloper_Setup_Wizard {
 			'configuration' => __( 'Configuration', 'essential-addons-for-elementor-lite' ),
 			'elements'      => __( 'Elements', 'essential-addons-for-elementor-lite' ),
 			'go_pro'        => __( 'Go PRO', 'essential-addons-for-elementor-lite' ),
+			'thinkrank'     => __( 'Boost SEO & Speed', 'essential-addons-for-elementor-lite' ),
 			'pluginspromo'  => __( 'Plugins', 'essential-addons-for-elementor-lite' ),
 			'integrations'  => __( 'Integrations', 'essential-addons-for-elementor-lite' ),
 		];
@@ -144,7 +146,7 @@ class WPDeveloper_Setup_Wizard {
 
 		return $menu_items;
 	}
-	
+
 	public function data_getting_started_content(){
 		$getting_started_content = [
 			'youtube_promo_src' => esc_url( EAEL_PLUGIN_URL . 'assets/admin/images/quick-setup/youtube-promo.png' ),
@@ -153,7 +155,7 @@ class WPDeveloper_Setup_Wizard {
 
 		return $getting_started_content;
 	}
-	
+
 	public function data_configuration_content(){
 		$configuration_content = [
 			'ea_logo_src' => esc_url( EAEL_PLUGIN_URL . 'assets/admin/images/quick-setup/ea-new.png' ),
@@ -169,7 +171,7 @@ class WPDeveloper_Setup_Wizard {
 
 		return $elements_content;
 	}
-	
+
 	public function data_go_pro_content(){
 		$feature_items = [
 			[
@@ -255,6 +257,180 @@ class WPDeveloper_Setup_Wizard {
 
 		return $go_pro_content;
 	}
+	/**
+	 * Dedicated "Boost SEO & Speed" step data — ThinkRank (AI SEO) and xSpeed
+	 * (caching / performance). Rendered as its own wizard tab before the
+	 * Templately / Essential Blocks Plugins step. No Essential Addons branding —
+	 * pure "configure SEO & performance" framing.
+	 *
+	 * The two halves are decided INDEPENDENTLY, and each one only drops out
+	 * when the site already has that plugin on disk:
+	 *
+	 * - ThinkRank installed (active or not) → the step keeps rendering, minus
+	 *   every SEO line. The step is not a ThinkRank ad; it is the wizard's
+	 *   "make this site fast and findable" step, and half of that is still on
+	 *   offer.
+	 * - xSpeed installed → same, minus every performance line.
+	 * - Both installed → nothing left to offer, so the tab is hidden.
+	 *
+	 * An incumbent page cache (a foreign advanced-cache.php drop-in, another
+	 * cache plugin) deliberately does NOT suppress the xSpeed half. It only
+	 * changes what the install DOES: EA claims the install and xSpeed inspects
+	 * the site for itself, taking its `conflict-safe` profile — everything off,
+	 * page caching refused — rather than overwriting the drop-in it found.
+	 * 'page_cache_owner' names that incumbent when it can be named at all;
+	 * xSpeed is the only thing that knows, so it is empty until xSpeed is
+	 * active. Empty means "we cannot tell", not "nothing owns it".
+	 *
+	 * TODO(design): swap $tr_icon for a proper hero image + per-feature icons.
+	 */
+	public function data_thinkrank_content(){
+		$tr_icon      = EAEL_PLUGIN_URL . 'assets/admin/images/quick-setup/thinkrankxspeed.svg';
+		$tr_only_icon = EAEL_PLUGIN_URL . 'assets/admin/images/thinkrank/icon.svg';
+		$xs_only_icon = EAEL_PLUGIN_URL . 'assets/admin/images/xspeed/icon.svg';
+
+		$thinkrank_data = $this->get_local_plugin_data( 'thinkrank/thinkrank.php' );
+
+		// On disk at all, active or not — a site that already has ThinkRank has
+		// made its decision about SEO, so the step stops selling it and shows
+		// only what is left.
+		$offer_thinkrank = false === $thinkrank_data;
+
+		// Not gated on the page cache being free. can_install() answers "xSpeed
+		// is absent, this site can run it, and the shared offer record says
+		// nobody has answered yet" — a decline or a removal from any
+		// WPDeveloper plugin keeps it out of this step.
+		$offer_xspeed = XSpeed_Setup::can_install();
+
+		if ( $offer_xspeed ) {
+			XSpeed_Setup::record_offered();
+		}
+
+		$plugins = [];
+
+		if ( $offer_thinkrank ) {
+			$plugins[] = [
+				'slug'              => 'thinkrank',
+				'basename'          => 'thinkrank/thinkrank.php',
+				'is_active'         => is_plugin_active( 'thinkrank/thinkrank.php' ),
+				'local_plugin_data' => $thinkrank_data,
+			];
+		}
+
+		if ( $offer_xspeed ) {
+			$plugins[] = [
+				'slug'              => XSpeed_Setup::SLUG,
+				'basename'          => XSpeed_Setup::BASENAME,
+				'is_active'         => is_plugin_active( XSpeed_Setup::BASENAME ),
+				'local_plugin_data' => $this->get_local_plugin_data( XSpeed_Setup::BASENAME ),
+			];
+		}
+
+		// Kept under its historical name because MenuItems.jsx, App.jsx and
+		// pluginPromoUtils.js all read it as "hide this step". True now means
+		// there is nothing left to offer — either half being installed no
+		// longer hides the step on its own.
+		$all_installed = empty( $plugins );
+
+		// Feature lines follow the offer, so the step never promises something
+		// it will not install.
+		$seo_features = [
+			[
+				'content' => __( 'AI-powered SEO titles, meta & schema', 'essential-addons-for-elementor-lite' ),
+			],
+			[
+				'content' => __( 'Optimize for Google & AI answers', 'essential-addons-for-elementor-lite' ),
+			],
+			[
+				'content' => __( 'Automatic sitemaps & structured data', 'essential-addons-for-elementor-lite' ),
+			],
+		];
+
+		$speed_features = [
+			[
+				'content' => __( 'Smart caching & performance optimization', 'essential-addons-for-elementor-lite' ),
+			],
+			[
+				'content' => __( 'Faster page loads & better Core Web Vitals', 'essential-addons-for-elementor-lite' ),
+			],
+			[
+				'content' => __( 'Asset optimization & CDN ready', 'essential-addons-for-elementor-lite' ),
+			],
+		];
+
+		if ( $offer_thinkrank && $offer_xspeed ) {
+			$features = array_merge(
+				array_slice( $seo_features, 0, 2 ),
+				array_slice( $speed_features, 0, 2 )
+			);
+			$features[] = [
+				'content' => __( 'Built-in AI tools with MCP support', 'essential-addons-for-elementor-lite' ),
+			];
+
+			$logo      = $tr_icon;
+			$title     = __( 'Better SEO | Faster Performance', 'essential-addons-for-elementor-lite' );
+			$subtitle  = __( 'Get found on Google and in AI answers, while keeping your site fast and optimized, automatically.', 'essential-addons-for-elementor-lite' );
+			$menu_text = __( 'Boost SEO & Speed', 'essential-addons-for-elementor-lite' );
+			$cta       = __( 'Boost SEO & Performance', 'essential-addons-for-elementor-lite' );
+			$open_url  = admin_url( 'admin.php?page=thinkrank' );
+		} elseif ( $offer_xspeed ) {
+			// ThinkRank is already here — drop every SEO line rather than the
+			// whole step.
+			$features   = $speed_features;
+			$features[] = [
+				'content' => __( 'Works with your existing setup, no redesign', 'essential-addons-for-elementor-lite' ),
+			];
+
+			$logo      = $xs_only_icon;
+			$title     = __( 'Speed Up Every Page You Build', 'essential-addons-for-elementor-lite' );
+			$subtitle  = __( 'Smart caching, asset optimization and CDN keep your pages fast and lift Core Web Vitals, automatically.', 'essential-addons-for-elementor-lite' );
+			$menu_text = __( 'Boost Speed', 'essential-addons-for-elementor-lite' );
+			$cta       = __( 'Boost Performance', 'essential-addons-for-elementor-lite' );
+			$open_url  = admin_url( 'admin.php?page=' . \Essential_Addons_Elementor\Classes\ThinkRank_Promotion::XSPEED_ADMIN_PAGE );
+		} else {
+			// xSpeed is already here (or this site cannot run it) — SEO only.
+			$features   = $seo_features;
+			$features[] = [
+				'content' => __( 'Rank tracking with GA4 integration', 'essential-addons-for-elementor-lite' ),
+			];
+			$features[] = [
+				'content' => __( 'Built-in AI tools with MCP support', 'essential-addons-for-elementor-lite' ),
+			];
+
+			$logo      = $tr_only_icon;
+			$title     = __( 'Better SEO for Every Page You Build', 'essential-addons-for-elementor-lite' );
+			$subtitle  = __( 'Get found on Google and in AI answers, automatically.', 'essential-addons-for-elementor-lite' );
+			$menu_text = __( 'Boost SEO', 'essential-addons-for-elementor-lite' );
+			$cta       = __( 'Boost SEO', 'essential-addons-for-elementor-lite' );
+			$open_url  = admin_url( 'admin.php?page=thinkrank' );
+		}
+
+		return [
+			'slug'              => 'thinkrank',
+			'basename'          => 'thinkrank/thinkrank.php',
+			'is_active'         => is_plugin_active( 'thinkrank/thinkrank.php' ),
+			'local_plugin_data' => $thinkrank_data,
+			'plugins'           => $plugins,
+			'all_installed'     => $all_installed,
+			'offers_thinkrank'  => $offer_thinkrank,
+			'offers_xspeed'     => $offer_xspeed,
+			// What already owns the page cache, so a UI can say the install
+			// will leave it alone. Empty when nothing does OR when we cannot
+			// tell — only xSpeed knows, and it is not active on this step.
+			'page_cache_owner'  => XSpeed_Setup::page_cache_owner(),
+			'logo'              => $logo,
+			'promo_img_url'     => EAEL_PLUGIN_URL . 'assets/admin/images/quick-setup/thinkrank-xspeed.jpg',
+			'menu_label'        => $menu_text,
+			'title'             => $title,
+			'subtitle'          => $subtitle,
+			'install_label'     => $cta,
+			'installing_label'  => __( 'Configuring…', 'essential-addons-for-elementor-lite' ),
+			'done_label'        => __( 'Configured', 'essential-addons-for-elementor-lite' ),
+			'skip_label'        => __( 'Skip for now', 'essential-addons-for-elementor-lite' ),
+			'open_url'          => $open_url,
+			'features'          => $features,
+		];
+	}
 
 	public function data_plugins_content(){
 		$plugins_content = [
@@ -272,7 +448,7 @@ class WPDeveloper_Setup_Wizard {
 				'local_plugin_data' => $this->get_local_plugin_data( 'templately/templately.php' ),
 				'promo_img_url'     => EAEL_PLUGIN_URL . 'assets/admin/images/quick-setup/templately-qs-img.png',
 				'titles'            => [
-					__("5000+", "essential-addons-for-elementor-lite"),
+					__("6500+", "essential-addons-for-elementor-lite"),
 					__("Ready Templates", "essential-addons-for-elementor-lite")
 				],
 				'features' => [
@@ -326,10 +502,10 @@ class WPDeveloper_Setup_Wizard {
 				],
 			];
 		}
-		
+
 		return $plugins_content;
 	}
-	
+
 	public function data_integrations_content(){
 		$integrations_content = [
 			'plugin_list' => $this->get_plugin_list(),
@@ -337,7 +513,7 @@ class WPDeveloper_Setup_Wizard {
 
 		return $integrations_content;
 	}
-	
+
 	public function data_modal_content(){
 		$modal_content = [
 			'success_2_src' => EAEL_PLUGIN_URL . 'assets/admin/images/quick-setup/success-2.png',
@@ -351,7 +527,16 @@ class WPDeveloper_Setup_Wizard {
 	 * @return array
 	 */
 	public function get_plugin_list() {
-		return [
+		$plugin_list = [
+			[
+				'slug'     => 'thinkrank',
+				'basename' => 'thinkrank/thinkrank.php',
+				'logo'     => EAEL_PLUGIN_URL . 'assets/admin/images/quick-setup/thinkrank.svg',
+				'title'    => __( 'ThinkRank – AI SEO Assistant', 'essential-addons-for-elementor-lite' ),
+				'desc'     => __( 'Get found on Google & AI answers. ThinkRank optimizes titles, meta, schema & sitemaps and tracks rankings with GA4 - turn the pages you build into pages that rank.', 'essential-addons-for-elementor-lite' ),
+				'is_active' => is_plugin_active( 'thinkrank/thinkrank.php' ),
+				'local_plugin_data' => $this->get_local_plugin_data( 'thinkrank/thinkrank.php' ),
+			],
 			[
 				'slug'     => 'betterdocs',
 				'basename' => 'betterdocs/betterdocs.php',
@@ -425,6 +610,26 @@ class WPDeveloper_Setup_Wizard {
 				'local_plugin_data' => $this->get_local_plugin_data( 'essential-blocks/essential-blocks.php' ),
 			],
 		];
+
+		// xSpeed earns a row whenever this site can run it — installed or not,
+		// active or not, incumbent cache or not: xSpeed installs beside
+		// anything and picks its own profile. It sits right after ThinkRank,
+		// the other half of the "Boost SEO & Speed" pairing.
+		if ( XSpeed_Setup::can_list() ) {
+			array_splice( $plugin_list, 1, 0, [
+				[
+					'slug'     => XSpeed_Setup::SLUG,
+					'basename' => XSpeed_Setup::BASENAME,
+					'logo'     => EAEL_PLUGIN_URL . 'assets/admin/images/quick-setup/xspeed.png',
+					'title'    => __( 'xSpeed Cache', 'essential-addons-for-elementor-lite' ),
+					'desc'     => __( 'Make every page you build load faster. xSpeed handles smart caching, asset optimization & CDN, improving Core Web Vitals without touching your design.', 'essential-addons-for-elementor-lite' ),
+					'is_active' => is_plugin_active( XSpeed_Setup::BASENAME ),
+					'local_plugin_data' => $this->get_local_plugin_data( XSpeed_Setup::BASENAME ),
+				],
+			] );
+		}
+
+		return $plugin_list;
 	}
 
 	/**
@@ -467,7 +672,7 @@ class WPDeveloper_Setup_Wizard {
 			return;
 		}
 
-		wp_parse_str( $_POST[ 'fields' ], $fields );
+		wp_parse_str( $_POST[ 'fields' ], $fields ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
 
 		if ( isset( $fields[ 'eael_user_email_address' ] ) && intval( $fields[ 'eael_user_email_address' ] ) == 1 ) {
 			$this->wpins_process();
@@ -491,8 +696,8 @@ class WPDeveloper_Setup_Wizard {
 			return;
 		}
 
-		wp_parse_str( $_POST[ 'fields' ], $fields );
-		
+		wp_parse_str( $_POST[ 'fields' ], $fields ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+
 		$this->wpins_process();
 
 		wp_send_json_success();
@@ -512,7 +717,7 @@ class WPDeveloper_Setup_Wizard {
 			return;
 		}
 
-		wp_parse_str( $_POST[ 'fields' ], $fields );
+		wp_parse_str( $_POST[ 'fields' ], $fields ); //phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
 
 		if ( $this->save_element_list( $fields ) ) {
 			wp_send_json_success();
@@ -615,6 +820,21 @@ class WPDeveloper_Setup_Wizard {
 						'title'       => __( 'Simple Menu', 'essential-addons-for-elementor-lite' ),
 						'preferences' => 'basic',
 					],
+					[
+						'key'         => 'mega-menu',
+						'title'       => __( 'Mega Menu', 'essential-addons-for-elementor-lite' ),
+						'preferences' => 'advance',
+					],
+					[
+						'key'         => 'breadcrumbs',
+						'title'       => __( 'Breadcrumbs', 'essential-addons-for-elementor-lite' ),
+						'preferences' => 'advance',
+					],
+					[
+						'key'         => 'code-snippet',
+						'title'       => __( 'Code Snippet', 'essential-addons-for-elementor-lite' ),
+						'preferences' => 'advance',
+					],
 				]
 			],
 			'dynamic-content-elements' => [
@@ -700,6 +920,11 @@ class WPDeveloper_Setup_Wizard {
 					[
 						'key'         => 'stacked-cards',
 						'title'       => __( 'Stacked Cards', 'essential-addons-for-elementor-lite' ),
+						'preferences' => 'advance',
+					],
+					[
+						'key'         => 'pricing-slider',
+						'title'       => __( 'Pricing Slider', 'essential-addons-for-elementor-lite' ),
 						'preferences' => 'advance',
 					],
 					[
@@ -824,18 +1049,33 @@ class WPDeveloper_Setup_Wizard {
 						'preferences' => 'advance',
 					],
 					[
+						'key'         => 'woo-product-title',
+						'title'       => __( 'Woo Product Title', 'essential-addons-for-elementor-lite' ),
+						'preferences' => 'advance',
+					],
+					[
 						'key'         => 'woo-product-price',
 						'title'       => __( 'Woo Product Price', 'essential-addons-for-elementor-lite' ),
 						'preferences' => 'advance',
 					],
 					[
-						'key'         => 'woo-product-rating',
-						'title'       => __( 'Woo Product Rating', 'essential-addons-for-elementor-lite' ),
+						'key'         => 'woo-product-tabs',
+						'title'       => __( 'Woo Product Tabs', 'essential-addons-for-elementor-lite' ),
 						'preferences' => 'advance',
 					],
 					[
-						'key'         => 'breadcrumbs',
-						'title'       => __( 'Breadcrumbs', 'essential-addons-for-elementor-lite' ),
+						'key'         => 'woo-product-short-description',
+						'title'       => __( 'Woo Product Short Description', 'essential-addons-for-elementor-lite' ),
+						'preferences' => 'advance',
+					],
+					[
+						'key'         => 'woo-product-description',
+						'title'       => __( 'Woo Product Description', 'essential-addons-for-elementor-lite' ),
+						'preferences' => 'advance',
+					],
+					[
+						'key'         => 'woo-product-rating',
+						'title'       => __( 'Woo Product Rating', 'essential-addons-for-elementor-lite' ),
 						'preferences' => 'advance',
 					],
 					[
@@ -876,7 +1116,7 @@ class WPDeveloper_Setup_Wizard {
 		}
 
 		update_option( 'eael_setup_wizard', 'init' );
-		wp_redirect( admin_url( 'admin.php?page=eael-setup-wizard' ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=eael-setup-wizard' ) );
 	}
 
 	public function change_site_title() {

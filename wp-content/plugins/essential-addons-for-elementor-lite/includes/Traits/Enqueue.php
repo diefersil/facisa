@@ -84,7 +84,7 @@ trait Enqueue
     // templately promo enqueue scripts
     public function templately_promo_enqueue_scripts(){
         // enqueue
-        wp_register_script(
+        wp_register_script( // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.NotInFooter -- Kept in the header; moving it would change script load order on existing sites.
             'templately-promo',
             EAEL_PLUGIN_URL . 'assets/admin/js/eael-templately-promo.js',
             ['jquery'],
@@ -100,6 +100,7 @@ trait Enqueue
         wp_enqueue_style(
             'templately-promo',
             EAEL_PLUGIN_URL . 'assets/admin/css/eael-templately-promo.css',
+            [],
             EAEL_PLUGIN_VERSION
         );
 
@@ -110,7 +111,7 @@ trait Enqueue
         $src = EAEL_PLUGIN_URL . 'assets/admin/images/templately/logo-icon.svg';
         $css = "
 		.elementor-add-new-section .elementor-add-templately-promo-button{
-            background-color: #5d4fff;
+            background-color: #5d4fff !important;
             background-image: url({$src});
             background-repeat: no-repeat;
             background-position: center center;

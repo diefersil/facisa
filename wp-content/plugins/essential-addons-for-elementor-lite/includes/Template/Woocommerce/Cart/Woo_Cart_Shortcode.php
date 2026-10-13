@@ -25,6 +25,7 @@ if ( class_exists( '\WC_Shortcode_Cart' ) ) {
 			wc_maybe_define_constant( 'WOOCOMMERCE_CART', true );
 
 			$atts        = shortcode_atts( [], $atts, 'woocommerce_cart' );
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.NonceVerification.Recommended, WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.MissingUnslash, WordPress.Security.ValidatedSanitizedInput.InputNotValidated
 			$nonce_value = wc_get_var( $_REQUEST['woocommerce-shipping-calculator-nonce'],
 				wc_get_var( $_REQUEST['_wpnonce'], '' ) ); // @codingStandardsIgnoreLine.
 
@@ -46,7 +47,7 @@ if ( class_exists( '\WC_Shortcode_Cart' ) ) {
 			WC()->cart->calculate_totals();
 			$auto_update = $settings['eael_woo_cart_auto_cart_update'] === 'yes' ? 'eael-auto-update' : '';
 			if ( WC()->cart->is_empty() ) { ?>
-				<div class="eael-woo-cart-wrapper eael-woo-cart-empty <?php echo esc_attr( printf( '%s %s', "eael-woo-{$settings['ea_woo_cart_layout']}", $auto_update ) ); ?>">
+				<div class="eael-woo-cart-wrapper eael-woo-cart-empty <?php echo esc_attr( sprintf( '%s %s', "eael-woo-{$settings['ea_woo_cart_layout']}", $auto_update ) ); ?>">
 				<?php wc_get_template( 'cart/cart-empty.php' ); ?>
                 </div>
 				<?php
