@@ -78,7 +78,17 @@ jobs:
             index.php \
             license.txt \
             readme.html \
-            wp-*.php \
+            wp-activate.php \
+            wp-blog-header.php \
+            wp-comments-post.php \
+            wp-cron.php \
+            wp-links-opml.php \
+            wp-load.php \
+            wp-login.php \
+            wp-mail.php \
+            wp-settings.php \
+            wp-signup.php \
+            wp-trackback.php \
             wp-admin \
             wp-includes \
             mb.php \
@@ -203,6 +213,7 @@ jobs:
               -az \
               --partial \
               --exclude='.htaccess' \
+              --exclude='wp-config.php' \
               --timeout=600 \
               --info=progress2 \
               --stats \

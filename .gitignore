@@ -1,7 +1,23 @@
-_trash/
-wp-config.php
-.git/
-wp-content/*
-!wp-content/plugins/
-!wp-content/themes/
-.htaccess
+# Ignora tudo por padrão.
+/*
+
+# Mantém os diretórios do core WordPress.
+!/wp-admin/
+!/wp-includes/
+!/wp-content/
+
+# Mantém os arquivos padrão da raiz do WordPress.
+!/index.php
+!/license.txt
+!/readme.html
+!/wp-*.php
+!/wp-config.php
+
+# Mantém somente plugins e temas dentro de wp-content.
+/wp-content/*
+!/wp-content/plugins/
+!/wp-content/themes/
+
+# Arquivos adicionais permitidos na raiz.
+!/mb.php
+!/tel.php
