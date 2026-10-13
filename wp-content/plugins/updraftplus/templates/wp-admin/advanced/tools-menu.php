@@ -1,7 +1,5 @@
 <?php
-if (!defined('UPDRAFTPLUS_DIR')) {
-	die('No direct access allowed');
-}
+if (!defined('ABSPATH')) die('No direct access allowed');
 ?>
 <div tabindex="0" class="advanced_tools_button active" id="site_info">
 	<span class="advanced_tools_text dashicons dashicons-info"></span>
@@ -24,7 +22,7 @@ if (!defined('UPDRAFTPLUS_DIR')) {
 	<?php esc_html_e('Site size', 'updraftplus'); ?>
 </div>
 <div tabindex="0" class="advanced_tools_button" id="db_size">
-	<span class="advanced_tools_text dashicons dashicons-database-view"></span>
+	<span class="advanced_tools_text dashicons udp-dashicons-database-view"></span>
 	<?php esc_html_e('Database size', 'updraftplus'); ?>
 </div>
 <div tabindex="0" class="advanced_tools_button" id="cron_events">

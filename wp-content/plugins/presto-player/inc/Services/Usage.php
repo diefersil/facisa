@@ -63,6 +63,39 @@ class Usage implements Service {
 	 */
 	const KPI_RETENTION_DAYS = 2;
 
+	/**
+	 * Option key for the pending events queue.
+	 *
+	 * Must match the key BSF_Analytics_Events builds internally:
+	 * {slug}_usage_events_pending where slug is 'presto-player'.
+	 *
+	 * @var string
+	 */
+	const EVENTS_PENDING_OPTION = 'presto-player_usage_events_pending';
+
+	/**
+	 * Skins we ship, per preset type.
+	 *
+	 * Only used to guarantee a baseline 0 for each shipped skin — actual adoption
+	 * is read from the table, so unlisted/new skins still report.
+	 *
+	 * @var array<string, array<int, string>>
+	 */
+	const KNOWN_SKINS = array(
+		'skin'       => array( 'default', 'modern', 'business', 'stacked', 'floating-pill' ),
+		'audio_skin' => array( 'default', 'stacked' ),
+	);
+
+	/**
+	 * Maximum skin KPI keys reported per preset type.
+	 *
+	 * The skin column is a dropdown in the UI but plain text in the REST schema,
+	 * so odd data must not grow the kpi_name space without bound.
+	 *
+	 * @var int
+	 */
+	const MAX_SKIN_KPIS = 12;
+
 	// -------------------------------------------------------------------------
 	// Properties
 	// -------------------------------------------------------------------------
@@ -97,6 +130,9 @@ class Usage implements Service {
 		add_action( 'wp_ajax_presto_player_daily_views', array( $this, 'handle_daily_views' ) );
 		add_action( 'wp_ajax_nopriv_presto_player_daily_views', array( $this, 'handle_daily_views' ) );
 
+		// Learn progress fires from REST context (not admin), so register before the is_admin() gate.
+		add_action( 'presto_player_learn_progress_saved', array( $this, 'track_learn_chapter_progress' ) );
+
 		if ( ! is_admin() ) {
 			return;
 		}
@@ -127,11 +163,18 @@ class Usage implements Service {
 	 * @return \BSF_Analytics_Events|null
 	 */
 	public static function events() {
-		if ( ! class_exists( 'BSF_Analytics_Events' ) ) {
-			return null;
-		}
-
 		if ( null === self::$events ) {
+			if ( ! class_exists( 'BSF_Analytics_Events' ) ) {
+				$events_file = PRESTO_PLAYER_PLUGIN_DIR . 'inc/lib/bsf-analytics/class-bsf-analytics-events.php';
+				if ( file_exists( $events_file ) ) {
+					require_once $events_file;
+				}
+			}
+
+			if ( ! class_exists( 'BSF_Analytics_Events' ) ) {
+				return null;
+			}
+
 			self::$events = new \BSF_Analytics_Events( 'presto-player' );
 		}
 		return self::$events;
@@ -211,6 +254,7 @@ class Usage implements Service {
 		$this->detect_update_event( $events );
 		$this->detect_video_events( $events );
 		$this->detect_first_view_event( $events );
+		$this->detect_onboarding_event( $events );
 	}
 
 	/**
@@ -302,7 +346,7 @@ class Usage implements Service {
 		global $wpdb;
 		$table = $wpdb->prefix . 'presto_player_videos';
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$first_video = $wpdb->get_row(
 			"SELECT type FROM {$table} WHERE deleted_at IS NULL ORDER BY created_at ASC LIMIT 1" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
@@ -336,6 +380,85 @@ class Usage implements Service {
 	}
 
 	/**
+	 * Track onboarding wizard outcome.
+	 *
+	 * Mirrors the SureDash shape so Metabase reads one event across
+	 * products: value 'yes' when the wizard was finished, 'no' when it was
+	 * exited early (with the step the user bailed on). Gated on the result
+	 * option only the wizard endpoints write — the completion flag alone
+	 * won't do, since legacy installs and the 4.2.0 backfill set it too and
+	 * would flood Metabase with retroactive events on update.
+	 *
+	 * @param \BSF_Analytics_Events $events Events tracker instance.
+	 * @return void
+	 */
+	private function detect_onboarding_event( $events ) {
+		$result = (string) get_option( 'presto_player_onboarding_result', '' );
+		if ( '' === $result ) {
+			return;
+		}
+
+		$skipped    = 'skipped' === $result;
+		$properties = array();
+
+		if ( $skipped ) {
+			$step = sanitize_key( (string) get_option( 'presto_player_onboarding_skipped_step', '' ) );
+			if ( '' !== $step ) {
+				$properties['skipped_on_step'] = $step;
+			}
+		}
+
+		$events->track( 'onboarding_completed', $skipped ? 'no' : 'yes', $properties );
+	}
+
+	/**
+	 * Track learn chapter progress as a re-trackable event.
+	 *
+	 * Builds per-chapter completion status from the saved progress and
+	 * fires a single event whose properties show each chapter as
+	 * 'completed' or 'pending'. The event value is 'completed' only
+	 * when every chapter is done.
+	 *
+	 * @param array $saved_progress Full progress array from user meta.
+	 * @return void
+	 */
+	public function track_learn_chapter_progress( $saved_progress ) {
+		if ( empty( $saved_progress ) || ! is_array( $saved_progress ) ) {
+			return;
+		}
+
+		if ( ! self::events() ) {
+			return;
+		}
+
+		$chapters = Learn::get_chapters_structure();
+		if ( empty( $chapters ) ) {
+			return;
+		}
+
+		$properties   = array();
+		$all_complete = true;
+
+		foreach ( $chapters as $chapter ) {
+			$chapter_id = isset( $chapter['id'] ) ? $chapter['id'] : '';
+			if ( empty( $chapter_id ) ) {
+				continue;
+			}
+
+			$is_done = Learn::is_chapter_complete( $chapter, $saved_progress );
+
+			$properties[ sanitize_key( $chapter_id ) ] = $is_done ? 'completed' : 'pending';
+			if ( ! $is_done ) {
+				$all_complete = false;
+			}
+		}
+
+		$event_value = $all_complete ? 'completed' : 'in_progress';
+
+		self::retrack_event( 'learn_chapter_progress', $event_value, $properties );
+	}
+
+	/**
 	 * Track plugin deactivation event.
 	 *
 	 * Called from register_deactivation_hook. The event is stored in the
@@ -356,7 +479,7 @@ class Usage implements Service {
 		global $wpdb;
 		$table = $wpdb->prefix . 'presto_player_videos';
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$video_count = (int) $wpdb->get_var(
 			"SELECT COUNT(*) FROM {$table} WHERE deleted_at IS NULL" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
@@ -457,6 +580,7 @@ class Usage implements Service {
 			$this->get_core_kpis(),
 			$this->get_content_kpis(),
 			$this->get_feature_kpis(),
+			$this->get_skin_kpis(),
 			$this->get_integration_kpis()
 		);
 
@@ -484,7 +608,7 @@ class Usage implements Service {
 		$table = $wpdb->prefix . 'presto_player_videos';
 
 		// Video counts by type.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$type_counts = $wpdb->get_results(
 			"SELECT type, COUNT(*) as cnt FROM {$table} WHERE deleted_at IS NULL GROUP BY type" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
@@ -501,7 +625,7 @@ class Usage implements Service {
 		$counts['content_total_videos'] = $total;
 
 		// New videos in last 7 days.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$counts['content_new_videos_7d'] = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$table} WHERE deleted_at IS NULL AND created_at >= %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -510,7 +634,7 @@ class Usage implements Service {
 		);
 
 		// Media Hub items (published).
-		$media                            = new ReusableVideo();
+		$media                             = new ReusableVideo();
 		$counts['content_media_hub_count'] = (int) $media->getTotalPublished();
 
 		return $counts;
@@ -527,17 +651,17 @@ class Usage implements Service {
 		$audio_table   = $wpdb->prefix . 'presto_player_audio_presets';
 
 		// Custom presets.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$custom_presets = (int) $wpdb->get_var(
 			"SELECT COUNT(*) FROM {$presets_table} WHERE is_locked = 0" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$custom_audio = (int) $wpdb->get_var(
 			"SELECT COUNT(*) FROM {$audio_table} WHERE is_locked = 0" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
 
 		// Preset feature usage (0/1 — is any preset using this feature?).
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
 		$preset_features = $wpdb->get_row(
 			"SELECT
 				MAX(CASE WHEN cta != '' THEN 1 ELSE 0 END) as has_cta,
@@ -556,6 +680,7 @@ class Usage implements Service {
 		$youtube_settings   = get_option( 'presto_player_youtube', array() );
 		$ga_settings        = get_option( 'presto_player_google_analytics', array() );
 		$perf_settings      = get_option( 'presto_player_performance', array() );
+		$mcp_settings       = get_option( 'presto_player_mcp', array() );
 
 		return array(
 			'feature_custom_presets'       => $custom_presets,
@@ -572,7 +697,95 @@ class Usage implements Service {
 			'feature_analytics_enabled'    => ( ! empty( $analytics_settings['enable'] ) ) ? 1 : 0,
 			'feature_youtube_nocookie'     => ( ! empty( $youtube_settings['nocookie'] ) ) ? 1 : 0,
 			'feature_performance_module'   => ( ! empty( $perf_settings['module_enabled'] ) ) ? 1 : 0,
+			'feature_mcp_enabled'          => ( ! empty( $mcp_settings['enabled'] ) ) ? 1 : 0,
+			'feature_mcp_allow_changes'    => ( ! empty( $mcp_settings['allow_changes'] ) ) ? 1 : 0,
 		);
+	}
+
+	/**
+	 * Skin adoption KPIs — 0/1 per skin for video and audio presets.
+	 *
+	 * Skins come from the table rather than a fixed list, so a newly shipped skin
+	 * starts reporting without a code change here. Keys are sanitised and capped
+	 * (see MAX_SKIN_KPIS) to keep the kpi_name space bounded.
+	 *
+	 * Counts unlocked, non-deleted presets only — that is a deliberate choice by
+	 * someone, rather than the seeds every install ships with.
+	 *
+	 * @return array<string, int>
+	 */
+	private function get_skin_kpis(): array {
+		global $wpdb;
+		$presets_table = $wpdb->prefix . 'presto_player_presets';
+		$audio_table   = $wpdb->prefix . 'presto_player_audio_presets';
+
+		$kpis = array();
+		foreach ( self::KNOWN_SKINS as $prefix => $skins ) {
+			foreach ( $skins as $skin ) {
+				$key = self::skin_kpi_key( $skin );
+				if ( '' === $key ) {
+					continue;
+				}
+				$kpis[ 'feature_' . $prefix . '_' . $key ] = 0;
+			}
+		}
+
+		// One query for both tables. Empty/NULL skin renders as the default skin, so count it there.
+		//
+		// deleted_at IS NULL: presets are soft-deleted, so a trashed preset would
+		// otherwise report adoption forever.
+		//
+		// is_locked = 0: the shipped seeds are locked and already use modern and
+		// stacked on every install, which pinned those keys to 1 everywhere and
+		// left them carrying no signal. Restricting to unlocked presets measures
+		// what someone actually chose.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			"SELECT DISTINCT 'skin' as prefix, COALESCE( NULLIF( skin, '' ), 'default' ) as skin
+				FROM {$presets_table} WHERE deleted_at IS NULL AND is_locked = 0
+			UNION ALL
+			SELECT DISTINCT 'audio_skin' as prefix, COALESCE( NULLIF( skin, '' ), 'default' ) as skin
+				FROM {$audio_table} WHERE deleted_at IS NULL AND is_locked = 0
+			ORDER BY prefix, skin"
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$extra = array();
+		foreach ( (array) $rows as $row ) {
+			$key = self::skin_kpi_key( (string) $row->skin );
+			if ( '' === $key ) {
+				continue;
+			}
+
+			$prefix = 'audio_skin' === $row->prefix ? 'audio_skin' : 'skin';
+			$name   = 'feature_' . $prefix . '_' . $key;
+
+			// Shipped skins always report. The cap is spent on unknown slugs only,
+			// so junk in the column can never push a real skin out of the report;
+			// the ORDER BY keeps which ones survive stable between runs.
+			if ( ! array_key_exists( $name, $kpis ) ) {
+				$extra[ $prefix ] = ( $extra[ $prefix ] ?? 0 ) + 1;
+				if ( $extra[ $prefix ] > self::MAX_SKIN_KPIS ) {
+					continue;
+				}
+			}
+
+			$kpis[ $name ] = 1;
+		}
+
+		return $kpis;
+	}
+
+	/**
+	 * Normalise a skin slug for use in a kpi_name (`floating-pill` → `floating_pill`).
+	 *
+	 * @param string $skin Skin slug.
+	 * @return string Empty string when the slug is unusable.
+	 */
+	private static function skin_kpi_key( string $skin ): string {
+		$key = sanitize_key( str_replace( '-', '_', $skin ) );
+
+		return strlen( $key ) > 32 ? '' : $key;
 	}
 
 	/**
@@ -582,12 +795,12 @@ class Usage implements Service {
 	 */
 	private function get_integration_kpis(): array {
 		$integrations = array(
-			'integration_learndash'       => class_exists( 'SFWD_LMS' ),
-			'integration_tutor'           => function_exists( 'tutor' ),
-			'integration_lifter'          => function_exists( 'is_lifterlms' ),
-			'integration_elementor'       => did_action( 'elementor/loaded' ) > 0,
-			'integration_divi'            => defined( 'ET_BUILDER_VERSION' ),
-			'integration_beaver_builder'  => class_exists( 'FLBuilder' ),
+			'integration_learndash'      => class_exists( 'SFWD_LMS' ),
+			'integration_tutor'          => function_exists( 'tutor' ),
+			'integration_lifter'         => function_exists( 'is_lifterlms' ),
+			'integration_elementor'      => did_action( 'elementor/loaded' ) > 0,
+			'integration_divi'           => defined( 'ET_BUILDER_VERSION' ),
+			'integration_beaver_builder' => class_exists( 'FLBuilder' ),
 		);
 
 		$kpis  = array();
@@ -692,5 +905,63 @@ class Usage implements Service {
 			return (int) floor( ( time() - $install_time ) / DAY_IN_SECONDS );
 		}
 		return 0;
+	}
+
+	// -------------------------------------------------------------------------
+	// Re-trackable Event Helpers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Re-track an event: clear from both queues, then track fresh.
+	 *
+	 * Use for events whose payload changes over time (e.g. learn progress,
+	 * onboarding state) — each call replaces the previous entry so the
+	 * latest cumulative state is always what gets sent.
+	 *
+	 * @param string               $event_name  Event identifier.
+	 * @param string               $event_value Primary value.
+	 * @param array<string, mixed> $properties  Additional context.
+	 * @return void
+	 */
+	private static function retrack_event( $event_name, $event_value = '', $properties = array() ) {
+		self::clear_event( $event_name );
+
+		$events = self::events();
+		if ( $events ) {
+			$events->track( $event_name, $event_value, $properties );
+		}
+	}
+
+	/**
+	 * Remove an event from both pushed and pending queues without re-tracking.
+	 *
+	 * @param string $event_name Event identifier to clear.
+	 * @return void
+	 */
+	private static function clear_event( $event_name ) {
+		$events = self::events();
+		if ( ! $events ) {
+			return;
+		}
+
+		// Remove from pushed dedup list.
+		$events->flush_pushed( array( $event_name ) );
+
+		// Remove from pending queue (BSF_Analytics_Events has no API for this).
+		$pending = get_option( self::EVENTS_PENDING_OPTION, array() );
+		$pending = is_array( $pending ) ? $pending : array();
+		$pending = array_values(
+			array_filter(
+				$pending,
+				static function ( $event ) use ( $event_name ) {
+					// Keep malformed entries — only drop ones that explicitly match $event_name.
+					if ( ! is_array( $event ) || ! isset( $event['event_name'] ) ) {
+						return true;
+					}
+					return $event['event_name'] !== $event_name;
+				}
+			)
+		);
+		update_option( self::EVENTS_PENDING_OPTION, $pending );
 	}
 }

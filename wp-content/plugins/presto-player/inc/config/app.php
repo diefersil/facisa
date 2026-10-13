@@ -5,6 +5,10 @@
  * @package PrestoPlayer
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
+}
+
 return array(
 
 	/*
@@ -60,19 +64,38 @@ return array(
 		\PrestoPlayer\Services\Scripts::class,
 		\PrestoPlayer\Services\Blocks::class,
 		\PrestoPlayer\Services\Settings::class,
+		\PrestoPlayer\Services\Abilities\Module::class,
+
+		// OAuth + MCP auth. Module always registers (installs the schema on the
+		// enable transition); Bootstrap registers the gated endpoints only when
+		// AI access is on.
+		\PrestoPlayer\Services\OAuth\Module::class,
+		\PrestoPlayer\Services\OAuth\Bootstrap::class,
+
 		\PrestoPlayer\Services\VideoPostType::class,
 		\PrestoPlayer\Services\ReusableVideos::class,
 		\PrestoPlayer\Services\AdminNotices::class,
+		\PrestoPlayer\Services\FeatureAnnounce::class,
 		\PrestoPlayer\Services\Usage::class,
 		\PrestoPlayer\Services\ProCompatibility::class,
 		\PrestoPlayer\Services\Compatibility::class,
 		\PrestoPlayer\Services\AjaxActions::class,
+		\PrestoPlayer\Services\PluginInstaller::class,
+		\PrestoPlayer\Services\Onboarding::class,
+		\PrestoPlayer\Services\Learn::class,
+
+		// License.
+		\PrestoPlayer\Services\License\License::class,
 
 		// API.
 		\PrestoPlayer\Services\API\RestPresetsController::class,
 		\PrestoPlayer\Services\API\RestAudioPresetsController::class,
 		\PrestoPlayer\Services\API\RestSettingsController::class,
 		\PrestoPlayer\Services\API\RestVideosController::class,
+		\PrestoPlayer\Services\API\RestMediaPostController::class,
+		\PrestoPlayer\Services\API\RestMediaListController::class,
+		\PrestoPlayer\Services\API\RestEmailSubmissionsController::class,
+		\PrestoPlayer\Services\API\RestLicenseController::class,
 	),
 
 	/*

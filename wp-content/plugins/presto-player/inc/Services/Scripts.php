@@ -14,6 +14,7 @@ use PrestoPlayer\Plugin;
 use PrestoPlayer\Models\Block;
 use PrestoPlayer\Models\Setting;
 use PrestoPlayer\Pro\Services\API\RestBunnyTranscriptionController;
+use PrestoPlayer\Services\License\License;
 
 /**
  * Scripts class for handling script and style registration and enqueuing.
@@ -33,6 +34,7 @@ class Scripts {
 		// block assets.
 		add_action( 'enqueue_block_editor_assets', array( $this, 'blockEditorAssets' ) );
 		add_action( 'enqueue_block_assets', array( $this, 'blockAssets' ) );
+		add_filter( 'block_editor_settings_all', array( $this, 'iframeCdnFix' ) );
 
 		// learndash.
 		add_action( 'admin_enqueue_scripts', array( $this, 'learndashAdminScripts' ) );
@@ -40,10 +42,6 @@ class Scripts {
 		// elementor editor scripts.
 		add_action( 'elementor/frontend/before_enqueue_scripts', array( $this, 'elementorPreviewScripts' ) );
 		add_action( 'elementor/frontend/before_enqueue_scripts', array( $this, 'blockAssets' ) );
-
-		// admin pages.
-		add_action( 'admin_print_scripts-presto-player_page_presto_license', array( $this, 'licenseScripts' ) );
-		add_action( 'presto_player_pro_register_license_page', array( $this, 'licenseScripts' ) );
 
 		add_action( 'after_setup_theme', array( $this, 'addAppearanceToolsSupport' ), 99999 );
 
@@ -95,18 +93,76 @@ class Scripts {
 	/**
 	 * Add a type="module" to our components tag to lazy load them.
 	 *
+	 * Modifies the <script> element in place instead of rebuilding $tag from
+	 * scratch, so any translation block or inline script core has already
+	 * attached to this handle (via the script_loader_tag filter chain) is
+	 * preserved rather than silently dropped.
+	 *
 	 * @param string $tag    The <script> tag for the enqueued script.
 	 * @param string $handle The script's registered handle.
 	 * @param string $source The script's source URL.
 	 * @return string The modified script tag.
 	 */
 	public function prestoComponentsTag( $tag, $handle, $source ) {
-		if ( 'presto-components' === $handle ) {
-            // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript
-			$tag = '<script src="' . $source . '" type="module" defer></script>';
+		if ( 'presto-components' !== $handle ) {
+			return $tag;
 		}
 
-		return $tag;
+		// $source arrives esc_url()'d, so "&" and "'" are entity-encoded, while the
+		// tag processor hands back decoded attribute values — compare like for like.
+		$decoded_source = html_entity_decode( $source, ENT_QUOTES, 'UTF-8' );
+
+		$processor = new \WP_HTML_Tag_Processor( $tag );
+		if ( ! $this->seekComponentsScript( $processor, $decoded_source ) ) {
+			return $tag;
+		}
+
+		$processor->set_attribute( 'type', 'module' );
+		$processor->set_attribute( 'defer', true );
+
+		return $processor->get_updated_html();
+	}
+
+	/**
+	 * Leave the processor sitting on the handle's own <script> element.
+	 *
+	 * Prefers an exact src match, then the tag carrying id="presto-components-js"
+	 * (WordPress always stamps it, so the tag stays identifiable when a filter at a
+	 * lower priority rewrote or stripped src — delay-JS style src -> data-src), then
+	 * the first src-bearing tag.
+	 *
+	 * @param \WP_HTML_Tag_Processor $processor      Processor over the filtered tag.
+	 * @param string                 $decoded_source The script's source URL, decoded.
+	 * @return bool Whether a tag to modify was found.
+	 */
+	private function seekComponentsScript( $processor, $decoded_source ) {
+		$fallback = '';
+
+		while ( $processor->next_tag( array( 'tag_name' => 'script' ) ) ) {
+			$src = $processor->get_attribute( 'src' );
+
+			if ( $src === $decoded_source ) {
+				return true;
+			}
+
+			if ( 'presto-components-js' === $processor->get_attribute( 'id' ) ) {
+				$processor->set_bookmark( 'presto_components_tag' );
+				$fallback = 'id';
+				continue;
+			}
+
+			if ( '' === $fallback && null !== $src ) {
+				$processor->set_bookmark( 'presto_components_tag' );
+				$fallback = 'src';
+			}
+		}
+
+		if ( '' === $fallback ) {
+			return false;
+		}
+
+		$processor->seek( 'presto_components_tag' );
+		return true;
 	}
 
 	/**
@@ -152,10 +208,9 @@ class Scripts {
 			)
 		);
 
-		if ( function_exists( 'wp_set_script_translations' ) ) {
-			wp_set_script_translations( 'presto-components', 'presto-player' );
-		}
-
+		// No wp_set_script_translations for presto-components: the player bundle
+		// has no wp.i18n calls — its UI strings arrive already-translated via the
+		// localized geti18n() payload below.
 		wp_localize_script(
 			'presto-components',
 			'prestoPlayer',
@@ -173,6 +228,9 @@ class Scripts {
 					),
 					'proVersion'          => Plugin::proVersion(),
 					'isPremium'           => Plugin::isPro(),
+					'isProPluginActive'   => class_exists( '\PrestoPlayer\Pro\Plugin' ),
+					'hasLicenseKey'       => License::hasKey(),
+					'dashboardUrl'        => admin_url( 'admin.php?page=presto-dashboard' ),
 					'wpVersionString'     => 'wp/v2/',
 					'prestoVersionString' => 'presto-player/v1/',
 					'debug'               => defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG,
@@ -190,6 +248,7 @@ class Scripts {
 	 * @return void
 	 */
 	public function elementorPreviewScripts() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only preview-context detection; no state change.
 		if ( ! isset( $_GET['elementor-preview'] ) ) {
 			return;
 		}
@@ -235,8 +294,6 @@ class Scripts {
 			$assets['version'],
 			true
 		);
-		wp_enqueue_style( 'surecart/blocks/admin', trailingslashit( PRESTO_PLAYER_PLUGIN_URL ) . 'dist/blocks.css', array(), $assets['version'] );
-
 		wp_localize_script(
 			'surecart/blocks/admin',
 			'prestoPlayer',
@@ -250,6 +307,9 @@ class Scripts {
 					'isAdmin'               => is_admin(),
 					'proVersion'            => Plugin::proVersion(),
 					'isPremium'             => Plugin::isPro(),
+					'isProPluginActive'     => class_exists( '\PrestoPlayer\Pro\Plugin' ),
+					'hasLicenseKey'         => License::hasKey(),
+					'dashboardUrl'          => admin_url( 'admin.php?page=presto-dashboard' ),
 					'hasRequiredProVersion' => array(
 						'popups' => Plugin::hasRequiredProVersion( 'popups' ),
 					),
@@ -266,9 +326,7 @@ class Scripts {
 			)
 		);
 
-		if ( function_exists( 'wp_set_script_translations' ) ) {
-			wp_set_script_translations( 'surecart/blocks/admin', 'presto-player' );
-		}
+		wp_set_script_translations( 'surecart/blocks/admin', 'presto-player', PRESTO_PLAYER_PLUGIN_DIR . 'languages' );
 
 		wp_localize_script( 'surecart/blocks/admin', 'scIcons', array( 'path' => esc_url_raw( plugin_dir_url( PRESTO_PLAYER_PLUGIN_FILE ) . 'dist/icon-assets' ) ) );
 
@@ -367,6 +425,8 @@ class Scripts {
 			return true;
 		}
 
+		// Read-only request-context detection for page builders; no state change, so nonce verification does not apply.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		// enable on Elementor.
 		if ( ! empty( $_GET['action'] ) && 'elementor' === $_GET['action'] ) {
 			return true;
@@ -392,6 +452,7 @@ class Scripts {
 		if ( isset( $_GET['et_fb'] ) ) {
 			return true;
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		// do we have the player.
 		return $has_player;
@@ -405,7 +466,7 @@ class Scripts {
 	public function globalStyles() {
 		?>
 		<style>
-			<?php readfile( PRESTO_PLAYER_PLUGIN_DIR . 'src/player/global.css' ); ?>
+			<?php readfile( PRESTO_PLAYER_PLUGIN_DIR . 'src/player/global.css' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- Inlining a static plugin-bundled CSS file from a trusted constant path. ?>
 		</style>
 		<?php
 	}
@@ -429,6 +490,14 @@ class Scripts {
 	 * @return void
 	 */
 	public function blockAssets() {
+		if ( is_admin() ) {
+			$assets = include trailingslashit( PRESTO_PLAYER_PLUGIN_DIR ) . 'dist/blocks.asset.php';
+			// Depend on dashicons so it loads inside the WP 7.0 block editor iframe;
+			// block UIs (e.g. popup trigger picker) use dashicons that the iframe
+			// would otherwise not have.
+			wp_enqueue_style( 'surecart/blocks/admin', trailingslashit( PRESTO_PLAYER_PLUGIN_URL ) . 'dist/blocks.css', array( 'dashicons' ), $assets['version'] );
+		}
+
 		// don't output if it doesn't have our block.
 		if ( ! apply_filters( 'presto_player_load_js', $this->hasPlayer() ) ) {
 			return;
@@ -452,26 +521,41 @@ class Scripts {
 	}
 
 	/**
-	 * Enqueue scripts for the license page.
+	 * Fix CDN 403 errors inside the block editor iframe.
 	 *
-	 * @param string $hook The current admin page.
-	 * @return void
+	 * WP 7.0+ blob: iframes send no Referer header for cross-origin
+	 * requests — blob: is a "local scheme" per Fetch spec, so browsers
+	 * strip it entirely. CDNs like Bunny.net reject these with 403.
+	 *
+	 * Since the blob: iframe is same-origin with the parent admin page,
+	 * window.top is accessible. Replacing the iframe's XMLHttpRequest
+	 * with window.top.XMLHttpRequest makes HLS.js send requests through
+	 * the parent context, which has a proper HTTP Referer.
+	 *
+	 * Runs in any iframed editor canvas (post editor on WP 6.3+ when all
+	 * blocks are apiVersion 3, site editor, widgets editor) — the injected
+	 * script is only ever executed inside the iframe document, where
+	 * window !== window.top is always true. Only the WP 7.0+ blob: iframe
+	 * actually needs the fix; elsewhere the swap is a same-origin no-op.
+	 * No-op on frontend due to is_admin() check.
+	 *
+	 * @param array<string, mixed> $settings The block editor settings.
+	 * @return array<string, mixed> The filtered block editor settings.
 	 */
-	public function licenseScripts( $hook ) {
-		add_action(
-			"admin_print_scripts-{$hook}",
-			function () {
-				$assets = include trailingslashit( PRESTO_PLAYER_PLUGIN_DIR ) . 'dist/license.asset.php';
-				wp_enqueue_script(
-					'surecart/license/admin',
-					trailingslashit( PRESTO_PLAYER_PLUGIN_URL ) . 'dist/license.js',
-					array_merge( $assets['dependencies'] ),
-					$assets['version'],
-					true
-				);
-				wp_enqueue_style( 'surecart/license/admin', trailingslashit( PRESTO_PLAYER_PLUGIN_URL ) . 'dist/license.css', array(), $assets['version'] );
-			}
-		);
+	public function iframeCdnFix( $settings ) {
+		if ( ! is_admin() ) {
+			return $settings;
+		}
+		// WARNING: private WP API (__unstableResolvedAssets) — re-verify on each WP major.
+		if ( isset( $settings['__unstableResolvedAssets']['scripts'] ) ) {
+			$settings['__unstableResolvedAssets']['scripts'] =
+				'<script>try{if(window!==window.top){window.XMLHttpRequest=window.top.XMLHttpRequest;}}catch(e){}</script>'
+				. $settings['__unstableResolvedAssets']['scripts'];
+		} elseif ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// if WP renames the private key this fails silently and Bunny editor previews 403 again — log it.
+			error_log( 'Presto Player: __unstableResolvedAssets missing from editor settings, iframe CDN fix skipped.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- WP_DEBUG-gated diagnostic for a private WP API dependency.
+		}
+		return $settings;
 	}
 
 	/**

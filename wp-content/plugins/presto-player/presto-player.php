@@ -3,15 +3,17 @@
  * Plugin Name: Presto Player
  * Plugin URI: http://prestoplayer.com
  * Description: A beautiful, fast media player for WordPress.
- * Version: 4.1.4
+ * Version: 4.5.3
  * Author: Presto Made, Inc
  * Author URI: https://prestoplayer.com/
  * Text Domain: presto-player
  * Tags: private, video, lms, hls
- * Domain Path: languages
- * Requires at least: 6.3
- * Tested up to: 7.0
+ * Domain Path: /languages
+ * Requires at least: 6.5
+ * Tested up to: 7.1
  * Requires PHP: 7.4
+ * License: GPLv2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  *
  * @package PrestoPlayer
  */
@@ -43,6 +45,8 @@ register_activation_hook(
 register_deactivation_hook(
 	__FILE__,
 	function () {
+		wp_clear_scheduled_hook( 'presto_player_cleanup_email_submission_trash' );
+		wp_clear_scheduled_hook( PrestoPlayer\Services\OAuth\Module::GC_HOOK );
 		PrestoPlayer\Services\Usage::track_plugin_deactivated();
 	}
 );
@@ -56,9 +60,13 @@ register_uninstall_hook( __FILE__, 'presto_player_uninstall' );
  */
 function presto_player_uninstall() {
 	PrestoPlayer\Deactivator::uninstall();
+	PrestoPlayer\Services\License\License::uninstall();
 }
 
 // Plugin constants.
+// Keep in step with the Version header above. Without it, code that needs the
+// version has to parse this file's header on every request.
+define( 'PRESTO_PLAYER_VERSION', '4.5.3' );
 define( 'PRESTO_PLAYER_PLUGIN_FILE', __FILE__ );
 define( 'PRESTO_PLAYER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'PRESTO_PLAYER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

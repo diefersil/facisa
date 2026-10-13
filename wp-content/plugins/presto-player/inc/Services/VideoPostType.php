@@ -37,6 +37,7 @@ class VideoPostType {
 
 		add_action( 'init', array( $this, 'init' ) );
 		add_action( 'init', array( $this, 'registerMetaSettings' ) );
+		add_filter( 'is_protected_meta', array( $this, 'protectInstantVideoMeta' ), 10, 3 );
 
 		if ( version_compare( $wp_version, '5.8', '>=' ) ) {
 			add_filter( 'allowed_block_types_all', array( $this, 'allowedTypes' ), 10, 2 );
@@ -78,6 +79,46 @@ class VideoPostType {
 		add_action( 'transition_post_status', array( $this, 'set_post_title' ), 10, 3 );
 
 		add_filter( 'posts_where', array( $this, 'exclude_disabled_media_from_search' ), 10, 2 );
+
+		// Redirect legacy CPT list table to the new dashboard Media Hub tab.
+		// Gutenberg's editor "Back" arrow natively links to edit.php?post_type=<cpt>,
+		// so this redirect is still load-bearing even though no UI in this plugin
+		// links to the legacy URL directly.
+		add_action( 'load-edit.php', array( $this, 'redirectLegacyListToDashboard' ) );
+	}
+
+	/**
+	 * Redirect legacy edit.php?post_type=pp_video_block requests to the new
+	 * dashboard Media Hub tab. Catches Gutenberg's editor back-arrow, the
+	 * admin bar's "All Posts" link, and any direct bookmarks.
+	 *
+	 * @return void
+	 */
+	public function redirectLegacyListToDashboard() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$post_type = isset( $_GET['post_type'] ) ? sanitize_key( wp_unslash( $_GET['post_type'] ) ) : '';
+		if ( $this->post_type !== $post_type ) {
+			return;
+		}
+
+		$target = admin_url( 'admin.php?page=presto-dashboard&tab=MediaHub' );
+
+		/**
+		 * Filter whether to redirect the legacy CPT list table to the new dashboard.
+		 *
+		 * Return false to short-circuit the redirect — useful for integrators that
+		 * still rely on the native list UI, or for internal tests that need to
+		 * assert on the legacy screen.
+		 *
+		 * @param bool   $should_redirect Whether to perform the redirect. Default true.
+		 * @param string $target          The resolved redirect URL.
+		 */
+		if ( ! apply_filters( 'presto_player_redirect_legacy_media_list', true, $target ) ) {
+			return;
+		}
+
+		wp_safe_redirect( $target );
+		exit;
 	}
 
 	/**
@@ -206,7 +247,7 @@ class VideoPostType {
 				$output = $this->renderTitleWithPosterColumn( $post_ID );
 				break;
 		}
-		echo $output;
+		echo $output; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Output is pre-escaped HTML from helper methods above.
 	}
 
 	/**
@@ -260,7 +301,7 @@ class VideoPostType {
 		?>
 		<div class='pp-container' style="display: flex; justify-content: flex-start;">
 			<?php if ( '' !== $thumbnail ) : ?>
-				<div class='pp-container__media-icon pp-container__media-icon--image'><?php echo $thumbnail; ?></div>
+				<div class='pp-container__media-icon pp-container__media-icon--image'><?php echo $thumbnail; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Output is pre-escaped HTML from get_the_post_thumbnail(). ?></div>
 			<?php else : ?>
 				<div class='pp-container__media-icon pp-container__media-icon--image' style="
 					width: 75px;
@@ -274,7 +315,7 @@ class VideoPostType {
 					<?php
 					$svg_content = file_get_contents( PRESTO_PLAYER_PLUGIN_DIR . '/img/icon-white.svg' );
 
-					// Define allowed SVG elements and attributes
+					// Define allowed SVG elements and attributes.
 					$svg_args = array(
 						'svg'  => array(
 							'width'   => true,
@@ -327,11 +368,11 @@ class VideoPostType {
 	}
 
 	/**
-	 * Allowed block types
+	 * Allowed block types.
 	 *
-	 * @param  array  $allowed_block_types
-	 * @param  object $block_editor_content
-	 * @return void
+	 * @param array  $allowed_block_types   Array of allowed block types.
+	 * @param object $block_editor_content  Block editor context.
+	 * @return array
 	 */
 	public function allowedTypes( $allowed_block_types, $block_editor_content ) {
 		if ( ! empty( $block_editor_content->post->post_type ) ) {
@@ -351,11 +392,11 @@ class VideoPostType {
 	}
 
 	/**
-	 * Filter allowed block types for deprecated WordPress versions
+	 * Filter allowed block types for deprecated WordPress versions.
 	 *
-	 * @param array   $allowed_block_types Array of allowed block types
-	 * @param WP_Post $post               Post being loaded
-	 * @return array Filtered block types
+	 * @param array    $allowed_block_types Array of allowed block types.
+	 * @param \WP_Post $post                Post being loaded.
+	 * @return array Filtered block types.
 	 */
 	public function allowedTypesDeprecated( $allowed_block_types, $post ) {
 		if ( $post->post_type !== $this->post_type ) {
@@ -424,14 +465,15 @@ class VideoPostType {
 				),
 				'public'                => true,
 				'show_ui'               => true,
-				'show_in_menu'          => 'edit.php?post_type=pp_video_block',
+				'show_in_menu'          => false,
+				'show_in_admin_bar'     => true,
 				'rewrite'               => array(
 					'slug'       => 'media',
 					'with_front' => false,
 				),
 				'show_in_rest'          => true,
 				'rest_base'             => 'presto-videos',
-				'rest_controller_class' => 'WP_REST_Blocks_Controller',
+				'rest_controller_class' => 'WP_REST_Posts_Controller',
 				'map_meta_cap'          => true,
 				'supports'              => array(
 					'title',
@@ -462,12 +504,14 @@ class VideoPostType {
 			return;
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only admin list-table filter; core admin filters use GET without a nonce.
 		$selected      = isset( $_GET[ $taxonomy ] ) ? absint( $_GET[ $taxonomy ] ) : '';
 		$info_taxonomy = get_taxonomy( $taxonomy );
 
 		ob_start();
 		wp_dropdown_categories(
 			array(
+				/* translators: %s: taxonomy label */
 				'show_option_all' => sprintf( __( 'Show all %s', 'presto-player' ), $info_taxonomy->label ),
 				'taxonomy'        => $taxonomy,
 				'name'            => $taxonomy,
@@ -495,9 +539,9 @@ class VideoPostType {
 	}
 
 	/**
-	 * Modify admin query for tag
+	 * Modify admin query for tag.
 	 *
-	 * @param  \WP_Query $query
+	 * @param \WP_Query $query Query being modified.
 	 * @return void
 	 */
 	public function tagQuery( $query ) {
@@ -507,7 +551,7 @@ class VideoPostType {
 		$taxonomy  = 'pp_video_tag';
 
 		$q_vars = &$query->query_vars;
-		if ( $pagenow == 'edit.php' && isset( $q_vars['post_type'] ) && $q_vars['post_type'] == $post_type && isset( $q_vars[ $taxonomy ] ) && is_numeric( $q_vars[ $taxonomy ] ) && $q_vars[ $taxonomy ] != 0 ) {
+		if ( 'edit.php' === $pagenow && isset( $q_vars['post_type'] ) && $q_vars['post_type'] === $post_type && isset( $q_vars[ $taxonomy ] ) && is_numeric( $q_vars[ $taxonomy ] ) && 0 !== (int) $q_vars[ $taxonomy ] ) {
 			$term                = get_term_by( 'id', $q_vars[ $taxonomy ], $taxonomy );
 			$q_vars[ $taxonomy ] = $term->slug;
 		}
@@ -571,12 +615,34 @@ class VideoPostType {
 			$this->post_type,
 			'presto_player_instant_video_pages_enabled',
 			array(
-				'single'       => true,
-				'type'         => 'boolean',
-				'description'  => 'Enable Instant Video Pages',
-				'show_in_rest' => true,
+				'single'        => true,
+				'type'          => 'boolean',
+				'description'   => 'Enable Instant Video Pages',
+				'show_in_rest'  => true,
+				'auth_callback' => function ( $allowed, $meta_key, $post_id, $user_id ) {
+					return user_can( $user_id, 'edit_post', $post_id );
+				},
 			)
 		);
+	}
+
+	/**
+	 * Hide the instant video page meta from the Custom Fields metabox.
+	 *
+	 * If a user has the editor's "Custom fields" panel switched on, the metabox
+	 * renders this key as an editable row and posts its stale value back right
+	 * after Gutenberg's REST save — silently reverting the toggle.
+	 *
+	 * @param  bool   $protected  Whether the key is protected.
+	 * @param  string $meta_key   The meta key.
+	 * @param  string $meta_type  The object type.
+	 * @return bool
+	 */
+	public function protectInstantVideoMeta( $protected, $meta_key, $meta_type ) {
+		if ( 'post' === $meta_type && 'presto_player_instant_video_pages_enabled' === $meta_key ) {
+			return true;
+		}
+		return $protected;
 	}
 
 	/**
@@ -621,8 +687,14 @@ class VideoPostType {
 		if ( $this->post_type !== $post->post_type ) {
 			return $id;
 		}
-		$block         = $this->getMediaHubBlock( $post );
-		$poster        = ( ! empty( $block ) ) && isset( $block['attrs']['poster'] ) ? $block['attrs']['poster'] : '';
+		$block  = $this->getMediaHubBlock( $post );
+		$poster = ( ! empty( $block ) ) && isset( $block['attrs']['poster'] ) ? $block['attrs']['poster'] : '';
+		// No URL → nothing to resolve. Skips a wasted attachment_url_to_postid()
+		// DB query on every get_post_thumbnail_id() call for posts whose block
+		// doesn't define a poster (most YouTube / Vimeo / audio sources).
+		if ( '' === $poster ) {
+			return $id;
+		}
 		$attachment_id = attachment_url_to_postid( $poster );
 		return $attachment_id ? $attachment_id : $id;
 	}
@@ -683,6 +755,14 @@ class VideoPostType {
 			$assets['version'],
 			true
 		);
+		wp_enqueue_style(
+			'presto-player/toolbar/admin',
+			trailingslashit( PRESTO_PLAYER_PLUGIN_URL ) . 'dist/toolbar.css',
+			array(),
+			$assets['version']
+		);
+
+		wp_set_script_translations( 'presto-player/toolbar/admin', 'presto-player', PRESTO_PLAYER_PLUGIN_DIR . 'languages' );
 	}
 
 	/**

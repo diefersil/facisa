@@ -154,6 +154,7 @@ abstract class Model implements ModelInterface {
 		// Maybe get only published if we have soft deletes.
 		$where = ! empty( $this->schema()['deleted_at'] ) ? "WHERE (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') " : '';
 
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- Table name is a class property; $where is built from whitelisted schema values.
 		$results = $wpdb->get_results(
 			"SELECT * FROM {$wpdb->prefix}{$this->table} $where" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is a class property. $where is built from safe values.
 		);
@@ -225,10 +226,14 @@ abstract class Model implements ModelInterface {
 
 		// Soft deletes.
 		if ( ! empty( $this->schema()['deleted_at'] ) ) {
-			$status = ! empty( $args['status'] ) ? $args['status'] : '';
+			// Read from $query, not $args: the loop above drops every key that isn't a
+			// queryable column, and `status` is a scope rather than a column — so
+			// $args['status'] is always gone by the time we get here.
+			$status = ! empty( $query['status'] ) ? $query['status'] : '';
 			switch ( $status ) {
 				case 'trashed':
-					$where .= "AND (deleted_at IS NOT NULL OR deleted_at != '0000-00-00 00:00:00') ";
+					// Mirror of the published scope below: a zero date counts as not deleted.
+					$where .= "AND (deleted_at IS NOT NULL AND deleted_at != '0000-00-00 00:00:00') ";
 					break;
 				default: // Default to published.
 					$where .= "AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') ";
@@ -292,9 +297,9 @@ abstract class Model implements ModelInterface {
 			}
 		}
 
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared -- $where, $order_by, $pagination are built from safe values above.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where, $order_by, $pagination are built from safe values above.
 		$total = $wpdb->get_var( "SELECT count(id) as count FROM {$wpdb->prefix}{$this->table} $where" );
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared -- $select, $where, $order_by, $pagination are built from safe values above.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $select, $where, $order_by, $pagination are built from safe values above.
 		$results = $wpdb->get_results( "SELECT $select FROM {$wpdb->prefix}{$this->table} $where$order_by$pagination" );
 
 		return (object) array(
@@ -436,10 +441,12 @@ abstract class Model implements ModelInterface {
 		$args = $this->maybeSerializeArgs( $args );
 
 		// Insert.
-		$wpdb->insert( $wpdb->prefix . $this->table, $args );
+		$inserted = $wpdb->insert( $wpdb->prefix . $this->table, $args );
 
-		// Set ID in attributes.
-		$this->attributes->id = $wpdb->insert_id;
+		// Set ID in attributes. $wpdb->insert_id can hold a stale value from an
+		// earlier successful insert on this connection, so only trust it when this
+		// insert actually reported success.
+		$this->attributes->id = $inserted ? $wpdb->insert_id : 0;
 
 		// Created action.
 		do_action( "{$this->table}_created", $this );
@@ -563,7 +570,13 @@ abstract class Model implements ModelInterface {
 			unset( $merged['date_query'] );
 		}
 
-		$this->create( $merged );
+		$id = $this->create( $merged );
+		if ( is_wp_error( $id ) ) {
+			return $id;
+		}
+		if ( empty( $id ) ) {
+			return new \WP_Error( 'create_failed', __( 'Could not create record.', 'presto-player' ), array( 'status' => 500 ) );
+		}
 
 		// Return fresh instance.
 		return $this->fresh();
@@ -590,7 +603,10 @@ abstract class Model implements ModelInterface {
 		// Already created, update it.
 		if ( ! empty( $models->data[0] ) && ! empty( $update ) ) {
 			$this->set( $models->data[0]->toObject() );
-			$this->update( $update );
+			$updated = $this->update( $update );
+			if ( is_wp_error( $updated ) ) {
+				return $updated;
+			}
 			return $this;
 		}
 
@@ -602,7 +618,13 @@ abstract class Model implements ModelInterface {
 			unset( $merged['date_query'] );
 		}
 
-		$this->create( $merged );
+		$id = $this->create( $merged );
+		if ( is_wp_error( $id ) ) {
+			return $id;
+		}
+		if ( empty( $id ) ) {
+			return new \WP_Error( 'create_failed', __( 'Could not create record.', 'presto-player' ), array( 'status' => 500 ) );
+		}
 
 		// Return fresh instance.
 		return $this->fresh();
@@ -656,7 +678,7 @@ abstract class Model implements ModelInterface {
 	 * Update a model.
 	 *
 	 * @param array $args Attributes to update.
-	 * @return Model
+	 * @return Model|\WP_Error
 	 */
 	public function update( $args = array() ) {
 		global $wpdb;
@@ -668,9 +690,6 @@ abstract class Model implements ModelInterface {
 
 		// Unset guarded args.
 		$args = $this->unsetGuarded( $args );
-
-		// Parse args with default args.
-		$args = wp_parse_args( $args, $this->getDefaults() );
 
 		// Update time.
 		if ( ! empty( $this->schema()['updated_at'] ) ) {
@@ -700,7 +719,7 @@ abstract class Model implements ModelInterface {
 	/**
 	 * Trash model.
 	 *
-	 * @return Model
+	 * @return Model|\WP_Error
 	 */
 	public function trash() {
 		return $this->update( array( 'deleted_at' => current_time( 'mysql' ) ) );
@@ -709,7 +728,7 @@ abstract class Model implements ModelInterface {
 	/**
 	 * Untrash model.
 	 *
-	 * @return Model
+	 * @return Model|\WP_Error
 	 */
 	public function untrash() {
 		return $this->update( array( 'deleted_at' => null ) );

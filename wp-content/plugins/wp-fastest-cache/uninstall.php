@@ -16,7 +16,17 @@
 	include_once("wpFastestCache.php");
 
 	wpfastestcache_deactivate();
-	
+
+	// Remove Security tool data and rules when the plugin is uninstalled.
+	if (function_exists('wpfc_remove_htaccess_blocked_ips')) {
+		wpfc_remove_htaccess_blocked_ips();
+	}
+
+	$security_logs_table = $GLOBALS['wpdb']->prefix . 'wpfc_security_logs';
+	$GLOBALS['wpdb']->query("DROP TABLE IF EXISTS `{$security_logs_table}`");
+	delete_option('wpfc_fastest_security_enabled');
+	delete_option('wpfc_security_trial_started');
+
 	delete_option("WpFastestCache");
 	delete_option("WpFcDeleteCacheLogs");
 	delete_option("WpFastestCacheCDN");
@@ -37,7 +47,7 @@
 	delete_option("WpFastestCacheWOFF");
 	delete_option("WpFastestCacheWOFFSIZE");
 	delete_option("WpFastestCacheToolbarSettings");
-	delete_option("wpfc_server_location");
+	delete_option("wpfc_country_code");
 	delete_option("WpFcServerUrl");
 	delete_option("WpFcLastImageId");
 	delete_option("WpFcImgOptNonce");

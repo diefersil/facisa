@@ -402,26 +402,30 @@
 
 			if ($this->isPluginActive('elementor/elementor.php')) {
 			    // Elementor Plugin - Element Caching
-			    $new_option = get_option("elementor_element_cache_ttl");
-			    $old_option = get_option("elementor_experiment-e_element_cache");
+				$new_option = get_option('elementor_element_cache_ttl');
+				$old_option = get_option('elementor_experiment-e_element_cache');
 
-			    if ($new_option !== false) {
-			        // New version: if TTL > 0, element caching is active
-			        if ($new_option !== "disable") {
-			            return array(
-			                "You have to set the <u><a target='_blank' href='https://www.wpfastestcache.com/tutorial/elementor-plugin-settings/'>Element Caching</a></u> option of the Elementor plugin to Inactive",
-			                "error"
-			            );
-			        }
-			    } elseif ($old_option !== false) {
-			        // Old version: only check the old option if the new one does not exist
-			        if ($old_option !== "inactive") {
-			            return array(
-			                "You have to set the <u><a target='_blank' href='https://www.wpfastestcache.com/tutorial/elementor-plugin-settings/'>Element Caching</a></u> option of the Elementor plugin to Inactive",
-			                "error"
-			            );
-			        }
-			    }
+				$is_elementor_cache_inactive = false;
+
+				if ($new_option !== false) {
+
+					// New versions: element cache is active unless explicitly disabled/inactive
+				    $is_elementor_cache_inactive = in_array($new_option, ['disable', 'inactive'], true);
+
+				}elseif ($old_option !== false) {
+
+					// Old versions: element cache is active unless inactive
+				    $is_elementor_cache_inactive = ($old_option === 'inactive');
+
+				}
+
+				if (!$is_elementor_cache_inactive) {
+				    return array(
+				        "You have to set the <u><a target='_blank' href='https://www.wpfastestcache.com/tutorial/elementor-plugin-settings/'>Element Caching</a></u> option of the Elementor plugin to Inactive",
+				        "error"
+				    );
+				}
+
 
 
 			    $elementor_css_print_method_option = get_option("elementor_css_print_method");
@@ -672,7 +676,7 @@
 					'ExpiresByType application/x-font-truetype A10368000'."\n".
 					'</IfModule>'."\n".
 					'<IfModule mod_headers.c>'."\n".
-					'Header set Expires "max-age=A10368000, public"'."\n".
+					'Header set Expires "max-age=10368000, public"'."\n".
 					'Header unset ETag'."\n".
 					'Header set Connection keep-alive'."\n".
 					'FileETag None'."\n".
@@ -839,7 +843,7 @@
 			}
 
 			$query_string = "RewriteCond %{QUERY_STRING} !.+ [OR]"."\n".
-							"RewriteCond %{QUERY_STRING} fbclid="."\n";
+							"RewriteCond %{QUERY_STRING} (?:^|&)(?:fbclid|yclid|yadclid|ymclid|ysclid|yzclid|yqrid|ybaip|etext)="." [NC]\n";
 
 			$data = "# BEGIN WpFastestCache"."\n".
 					"# Modified Time: ".date("d-m-y G:i:s", current_time('timestamp'))."\n".
@@ -1104,6 +1108,14 @@
 				<h2><?php _e('WP Fastest Cache Options', 'wp-fastest-cache'); ?></h2>
 				
 				<?php settings_errors("wpfc-notice"); ?>
+				<?php
+					/**
+					 * Filters whether the Security beta tab is available in the admin interface.
+					 *
+					 * @param bool $show_security_beta Whether to show the Security beta tab. Default false.
+					 */
+					$show_security_beta = (bool) apply_filters('wpfc_show_security_beta', false);
+				?>
 
 				<div class="tabGroup">
 					<?php
@@ -1120,6 +1132,9 @@
 						array_push($tabs, array("id"=>"wpfc-exclude","title"=>__("Exclude", "wp-fastest-cache" )));
 						array_push($tabs, array("id"=>"wpfc-cdn","title"=>"CDN"));
 						array_push($tabs, array("id"=>"wpfc-db","title"=>"DB"));
+						if($show_security_beta){
+							array_push($tabs, array("id"=>"wpfc-security","title"=>__("Security (Beta)", "wp-fastest-cache" )));
+						}
 
 						foreach ($tabs as $key => $value){
 							$checked = "";
@@ -1138,6 +1153,30 @@
 							echo '<label for="'.esc_html($value["id"]).'">'.esc_html($value["title"]).'</label>'."\n";
 						}
 					?>
+					<script>
+						(function($) {
+							var $tabs = $('.tabGroup input[name="tabGroup1"]');
+
+							$tabs.on('change', function() {
+								if (window.location.hash !== '#' + this.id) {
+									window.location.hash = this.id;
+								}
+							});
+
+							var selectedTab = window.location.hash.substring(1);
+							var selectedInput = selectedTab ? document.getElementById(selectedTab) : null;
+							var $selectedTab = selectedInput && selectedInput.name === 'tabGroup1' ? $(selectedInput) : $();
+
+							if ($selectedTab.length) {
+								$selectedTab.prop('checked', true);
+								$(function() {
+									window.setTimeout(function() {
+										$selectedTab.trigger('change');
+									}, 0);
+								});
+							}
+						})(jQuery);
+					</script>
 				    <br>
 				    <div class="tab1" style="padding-left:10px;">
 						<form method="post" name="wp_manager" action="options.php">
@@ -1231,9 +1270,9 @@
 								<div class="question"><?php _e('Mobile Theme', 'wp-fastest-cache'); ?></div>
 								<div class="inputCon"><input type="checkbox" <?php echo $wpFastestCacheMobileTheme; ?> id="wpFastestCacheMobileTheme" name="wpFastestCacheMobileTheme"><label for="wpFastestCacheMobileTheme"><?php _e("Create cache for mobile theme", "wp-fastest-cache"); ?></label></div>
 								<div class="get-info"><a target="_blank" href="http://www.wpfastestcache.com/premium/mobile-cache/"><img src="<?php echo plugins_url("wp-fastest-cache/images/info.png"); ?>" /></a></div>
-							</div>
+				    </div>
 
-							<?php 
+					<?php
 								$tester_arr_mobile = array(
 									"tr-TR",
 									"tr",
@@ -1981,7 +2020,8 @@
 										<option value="regex">Regular Expression</option>
 
 										<option value="googleanalytics"><?php _e("has Google Analytics Parameters", "wp-fastest-cache"); ?></option>
-										<option value="yandexclickid"><?php _e("has Yandex Click ID Parameters", "wp-fastest-cache"); ?></option>
+										<option value="yandexclickid"><?php _e("has Yandex Metrica Parameters", "wp-fastest-cache"); ?></option>
+										<option value="facebookclickid"><?php _e("has Facebook Click ID Parameters", "wp-fastest-cache"); ?></option>
 										<option value="woocommerce_items_in_cart"><?php _e("has Woocommerce Items in Cart", "wp-fastest-cache"); ?></option>
 								</select>
 							</div>
@@ -2177,11 +2217,13 @@
 				    				jQuery("#revert-loader-toolbar").show();
 				    				jQuery("div[id='wpfc-modal-maxcdn'], div[id='wpfc-modal-other'], div[id='wpfc-modal-photon']").remove();
 
+				    				let wpfc_cdn_nonce = "<?php echo wp_create_nonce("cdn-nonce"); ?>";
+
 					    			jQuery.ajax({
 										type: 'GET', 
 										url: ajaxurl,
 										cache: false,
-										data : {"action": "wpfc_cdn_options"},
+										data : {"action": "wpfc_cdn_options", "nonce" : wpfc_cdn_nonce},
 										dataType : "json",
 										success: function(data){
 											if(data.id){
@@ -2194,7 +2236,7 @@
 											WpfcCDN.init({"id" : jQuery(e.currentTarget).attr("wpfc-cdn-name"),
 							    				"template_main_url" : "<?php echo plugins_url('wp-fastest-cache/templates/cdn'); ?>",
 							    				"values" : data,
-							    				"nonce" : "<?php echo wp_create_nonce("cdn-nonce"); ?>"
+							    				"nonce" : wpfc_cdn_nonce
 							    			});
 
 
@@ -2356,6 +2398,18 @@
 				    	</div>
 				    </div>
 
+				    <?php if($show_security_beta){ ?>
+				    	<div class="tab9" style="padding-left:20px;">
+				    		<?php
+				    			if(function_exists('wpfc_display_logs')){
+				    				wpfc_display_logs();
+				    			}else{
+				    				echo '<p>'.esc_html__('Security module could not be loaded.', 'wp-fastest-cache').'</p>';
+				    			}
+				    		?>
+				    	</div>
+				    <?php } ?>
+
 				    <?php include_once(WPFC_MAIN_PATH."templates/permission_error.html"); ?>
 				    <?php include_once(WPFC_MAIN_PATH."templates/toolbar_settings.php"); ?>
 
@@ -2440,7 +2494,11 @@
 
 		            	<?php if (get_locale() === 'tr_TR') { ?>
 		            		<a href="https://apps.apple.com/tr/app/i-ngilizce-kelimeler-%C3%B6%C4%9Fren/id1492827466?l=tr" target="_blank">
-		            			<img class="visual disable-lazy" src="<?php echo plugins_url("wp-fastest-cache/images/ads/" . rand(1, 6) . ".jpg"); ?>" alt="İngilizce Kelime Öğren!" data-pin-no-hover="true">
+		            			<img class="visual disable-lazy" src="<?php echo plugins_url("wp-fastest-cache/images/ads/" . rand(1, 4) . ".jpg"); ?>" alt="İngilizce Kelime Öğren!" data-pin-no-hover="true">
+		            		</a>
+		            	<?php }else if (get_locale() === 'de_DE') { ?>
+		            		<a href="https://apps.apple.com/de/app/englische-w%C3%B6rter-lernen/id1492827466" target="_blank">
+		            			<img class="visual disable-lazy" src="<?php echo plugins_url("wp-fastest-cache/images/ads/" . rand(1, 4) . "-de.jpg"); ?>" alt="Englische Wörter Lernen" data-pin-no-hover="true">
 		            		</a>
 		            	<?php }else{ ?>
 			                <div data-variant="7361" class="sticky-common-banner">

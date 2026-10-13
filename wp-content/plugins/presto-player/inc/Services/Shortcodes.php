@@ -373,6 +373,10 @@ class Shortcodes {
 			$create
 		);
 
+		if ( is_wp_error( $model ) ) {
+			return 0;
+		}
+
 		$model = $model->toObject();
 		return ! empty( $model->id ) ? $model->id : 0;
 	}
@@ -461,7 +465,7 @@ class Shortcodes {
 				$overlays[ $key ]['endTime'] = $overlay['end_time'];
 			}
 
-			$overlays[ $key ]['link']['url']           = $overlay['link_url'];
+			$overlays[ $key ]['link']['url']           = esc_url_raw( $overlay['link_url'] );
 			$overlays[ $key ]['link']['opensInNewTab'] = (bool) $overlay['link_new_tab'];
 
 			unset( $overlays[ $key ]['link_url'] );

@@ -28,7 +28,6 @@ class Translation implements Service {
 	 * @return void
 	 */
 	public function register() {
-		add_action( 'load_script_textdomain_relative_path', array( $this, 'scriptsPath' ), 10, 2 );
 		add_filter( 'presto_player/presto_player_presets/data', array( $this, 'translateDefaultPresets' ) );
 		add_action( 'init', array( $this, 'loadPluginTextDomain' ), 0 );
 		add_action( 'init', array( $this, 'initPresetTranslations' ), 0 );
@@ -71,20 +70,6 @@ class Translation implements Service {
 	}
 
 	/**
-	 * Get the scripts path.
-	 *
-	 * @param string $path Path.
-	 * @param string $src Source.
-	 * @return string
-	 */
-	public function scriptsPath( $path, $src ) {
-		if ( strpos( $src, 'presto-player' ) !== false ) {
-			return './src';
-		}
-		return $path;
-	}
-
-	/**
 	 * Get the i18n.
 	 *
 	 * @return array
@@ -95,6 +80,7 @@ class Translation implements Service {
 			'rewatch'              => __( 'Rewatch', 'presto-player' ),
 			'emailPlaceholder'     => __( 'Email address', 'presto-player' ),
 			'emailDefaultHeadline' => __( 'Enter your email to play this episode.', 'presto-player' ),
+			'emailError'           => __( 'Something went wrong. Please refresh the page and try again.', 'presto-player' ),
 			'chapters'             => __( 'Chapters', 'presto-player' ),
 			'show_chapters'        => __( 'Show Chapters', 'presto-player' ),
 			'hide_chapters'        => __( 'Hide Chapters', 'presto-player' ),

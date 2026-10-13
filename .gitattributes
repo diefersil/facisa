@@ -1,2 +1,5 @@
 # Keep text files on LF across platforms.
 * text=auto eol=lf
+
+# Preserve original line endings in the Instagram Feed plugin files.
+wp-content/plugins/instagram-feed/** -text

@@ -19,8 +19,82 @@ class Divi {
 	 * Registers the Divi integration.
 	 */
 	public function register() {
+		add_action( 'divi_module_library_modules_dependency_tree', array( $this, 'register_d5_modules' ) );
+		add_action( 'et_fb_framework_loaded', array( $this, 'register_d5_builder_assets' ) );
 		add_action( 'divi_extensions_init', array( $this, 'init' ) );
 		add_action( 'wp_ajax_presto_get_media_attributes', array( $this, 'getMediaItemAttributes' ) );
+	}
+
+	/**
+	 * Registers D5 module dependencies with the Divi module library.
+	 *
+	 * @param object $tree The Divi module dependency tree.
+	 * @return void
+	 */
+	public function register_d5_modules( $tree ) {
+		$tree->add_dependency( new D5\PrestoVideoModule() );
+	}
+
+	/**
+	 * Registers and enqueues the D5 builder script package.
+	 *
+	 * @return void
+	 */
+	public function register_d5_builder_assets() {
+		if ( ! class_exists( 'ET\\Builder\\VisualBuilder\\Assets\\PackageBuildManager' ) ) {
+			return;
+		}
+		$asset_file = PRESTO_PLAYER_PLUGIN_DIR . 'dist/divi-d5.asset.php';
+		if ( ! file_exists( $asset_file ) ) {
+			return;
+		}
+		$asset = include $asset_file;
+		if ( ! is_array( $asset ) || empty( $asset['version'] ) || ! isset( $asset['dependencies'] ) ) {
+			return;
+		}
+		$data  = array(
+			'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'wp_rest' ),
+		);
+		// PackageBuildManager localizes data_top_window/data_app_window under a global named
+		// pascal_case( name . 'Data' ) — so 'presto-player-divi-d5' exposes window.PrestoPlayerDiviD5Data,
+		// which is exactly what MediaHubField.jsx / PlayerEdit.jsx read. Keep the name in sync with that.
+		\ET\Builder\VisualBuilder\Assets\PackageBuildManager::register_package_build(
+			array(
+				'name'    => 'presto-player-divi-d5',
+				'version' => $asset['version'],
+				'script'  => array(
+					'src'                => PRESTO_PLAYER_PLUGIN_URL . 'dist/divi-d5.js',
+					'deps'               => array_merge( $asset['dependencies'], array( 'divi-module-library' ) ),
+					'args'               => array( 'in_footer' => true ),
+					'enqueue_top_window' => true,
+					'enqueue_app_window' => true,
+					'data_top_window'    => $data,
+					'data_app_window'    => $data,
+				),
+			)
+		);
+
+		// PackageBuildManager registers the handle later on wp_enqueue_scripts, so
+		// attach translations after it exists. Named callback, not a closure, so a
+		// second register_d5_builder_assets() call does not stack another copy; the
+		// wp_print_scripts pass catches a handle registered past priority 100.
+		add_action( 'wp_enqueue_scripts', array( $this, 'setD5ScriptTranslations' ), 100 );
+		add_action( 'wp_print_scripts', array( $this, 'setD5ScriptTranslations' ), 1 );
+	}
+
+	/**
+	 * Attach the JSON translations to the D5 builder package once it is registered.
+	 *
+	 * @return void
+	 */
+	public function setD5ScriptTranslations() {
+		if ( ! wp_script_is( 'presto-player-divi-d5', 'registered' ) ) {
+			return;
+		}
+		// Running on both hooks is harmless: WP_Scripts::set_translations() only adds
+		// the wp-i18n dependency once and re-setting the textdomain is a no-op.
+		wp_set_script_translations( 'presto-player-divi-d5', 'presto-player', PRESTO_PLAYER_PLUGIN_DIR . 'languages' );
 	}
 
 	/**
@@ -63,10 +137,12 @@ class Divi {
 			}
 		}
 		if ( ! empty( $block_id ) ) {
-			$post_model = new Post( get_post( $block_id ) );
-			$block      = $post_model->getMediaHubBlockFromPost( $block_id );
-			if ( ! empty( $block ) ) {
-				return $block;
+			// getMediaHubBlockFromPost() resolves the post itself, so don't build a Post
+			// model here - get_post() returns null for a deleted media hub item and the
+			// constructor is typed \WP_Post, which fataled the whole page.
+			$inner_block = Post::getMediaHubBlockFromPost( $block_id );
+			if ( ! empty( $inner_block ) ) {
+				return $inner_block;
 			}
 		}
 		return $block;
@@ -82,33 +158,73 @@ class Divi {
 	 * @return string
 	 */
 	public function rankMathFix( $tag, $handle, $src ) {
-		if ( 'wp-i18n' === $handle ) {
-            return '<script type="text/javascript" src="' . $src . '"></script>' . "\n"; // phpcs:ignore
+		if ( 'wp-i18n' !== $handle ) {
+			return $tag;
 		}
+		return $this->restoreScriptSrc( $tag, 'wp-i18n-js', $src );
+	}
+
+	/**
+	 * Put a normal type/src back on one <script> element, in place.
+	 *
+	 * Rebuilding the tag from scratch would drop everything else core put in it —
+	 * for wp-i18n that is the inline wp.i18n.setLocaleData() block carrying the
+	 * text direction, so an RTL locale would silently render LTR.
+	 *
+	 * @param string $tag The <script> tag for the enqueued script.
+	 * @param string $id  The id attribute of the element to restore.
+	 * @param string $src The script's source URL.
+	 * @return string
+	 */
+	private function restoreScriptSrc( $tag, $id, $src ) {
+		$processor = new \WP_HTML_Tag_Processor( $tag );
+
+		while ( $processor->next_tag( array( 'tag_name' => 'script' ) ) ) {
+			if ( $id === $processor->get_attribute( 'id' ) ) {
+				$processor->set_attribute( 'type', 'text/javascript' );
+				$processor->set_attribute( 'src', $src );
+				return $processor->get_updated_html();
+			}
+		}
+
 		return $tag;
 	}
 
 	/**
-	 * Get attributes to inject into JSX component
+	 * Get attributes to inject into JSX component.
 	 *
-	 * @param int $id id of the media item.
-	 * @return array|WP_Error
+	 * AJAX callback (wp_ajax_presto_get_media_attributes); reads the id from $_POST
+	 * and always responds via wp_send_json_*.
+	 *
+	 * @return void
 	 */
-	public function getMediaItemAttributes( $id ) {
-		\check_ajax_referer( 'et_admin_load_nonce' );
+	public function getMediaItemAttributes() {
+		// D4 sends et_admin_load_nonce; D5 sends wp_rest nonce via prestoPlayer.nonce.
+		// wp_rest is a broad, shared nonce, so the current_user_can() check below is the real
+		// authorization gate here — don't drop it assuming the nonce alone scopes access.
+		$nonce = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '';
+		$valid = wp_verify_nonce( $nonce, 'et_admin_load_nonce' )
+			|| wp_verify_nonce( $nonce, 'wp_rest' );
+		if ( ! $valid ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid nonce.', 'presto-player' ) ), 403 );
+		}
 
-		$id = (int) $_POST['id'] ?? 0;
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( array( 'message' => __( 'You are not allowed to do this.', 'presto-player' ) ), 403 );
+		}
+
+		$id = isset( $_POST['id'] ) ? absint( wp_unslash( $_POST['id'] ) ) : 0;
 
 		if ( ! $id ) {
-			return new \WP_Error( 'invalid', 'You must provide an id', array( 'status' => 400 ) );
+			wp_send_json_error( array( 'message' => __( 'You must provide an id.', 'presto-player' ) ), 400 );
 		}
 
 		$video = new ReusableVideo( $id );
-		if ( ! $video ) {
-			return false;
+		if ( ! $video->post || 'pp_video_block' !== $video->post->post_type ) {
+			wp_send_json_error( array( 'message' => __( 'Video not found.', 'presto-player' ) ), 404 );
 		}
 
-		return wp_send_json_success( $video->getAttributes() );
+		wp_send_json_success( $video->getAttributes() );
 	}
 
 	/**
@@ -129,8 +245,6 @@ class Divi {
 		);
 		wp_enqueue_style( 'surecart/divi/admin', trailingslashit( PRESTO_PLAYER_PLUGIN_URL ) . 'dist/divi.css', array(), $assets['version'] );
 
-		if ( function_exists( 'wp_set_script_translations' ) ) {
-			wp_set_script_translations( 'surecart/divi/admin', 'presto-player' );
-		}
+		wp_set_script_translations( 'surecart/divi/admin', 'presto-player', PRESTO_PLAYER_PLUGIN_DIR . 'languages' );
 	}
 }
