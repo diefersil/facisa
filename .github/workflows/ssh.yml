@@ -72,18 +72,18 @@ jobs:
           rm -rf deploy-root deploy-content
           mkdir -p deploy-root deploy-content/wp-content
 
-          # Copia os itens da raiz, exceto configurações e diretórios fora do deploy.
-          # wp-content será preparado separadamente, permitindo apenas plugins e themes.
-          for item in ./* ./.[!.]* ./..?*; do
+          # Allowlist: arquivos e diretórios do WordPress, mais mb.php e tel.php.
+          # Não enviar arquivos locais, configuração, .htaccess ou outros PHP da raiz.
+          for item in \
+            index.php \
+            license.txt \
+            readme.html \
+            wp-*.php \
+            wp-admin \
+            wp-includes \
+            mb.php \
+            tel.php; do
             [ -e "$item" ] || continue
-            nome="${item#./}"
-
-            case "$nome" in
-              wp-config.php|_trash|wp-content|.git|deploy-root|deploy-content)
-                continue
-                ;;
-            esac
-
             cp -a "$item" deploy-root/
           done
 
