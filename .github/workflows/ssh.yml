@@ -107,21 +107,6 @@ jobs:
         run: |
           set -e
 
-          CONTROL_SOCKET="$HOME/.ssh/hostgator-control"
-
-          rm -f "$CONTROL_SOCKET"
-
-          cleanup() {
-            ssh \
-              -S "$CONTROL_SOCKET" \
-              -O exit \
-              -p "$SSH_PORT" \
-              "$SSH_USER@$SSH_HOST" \
-              2>/dev/null || true
-          }
-
-          trap cleanup EXIT
-
           echo "======================================"
           echo "ABRINDO CONEXÃO SSH"
           echo "======================================"
@@ -134,9 +119,9 @@ jobs:
 
             if sshpass -e \
               ssh \
-                -M \
-                -S "$CONTROL_SOCKET" \
-                -fN \
+                -o ControlMaster=no \
+                -o ControlPath=none \
+                -o ControlPersist=no \
                 -p "$SSH_PORT" \
                 -o PubkeyAuthentication=no \
                 -o PreferredAuthentications=keyboard-interactive,password \
@@ -171,8 +156,9 @@ jobs:
           # TESTAR SSH
           # ======================================================
 
-          ssh \
-            -S "$CONTROL_SOCKET" \
+          sshpass -e ssh \
+            -o ControlMaster=no \
+            -o ControlPath=none \
             -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
             "echo 'Servidor SSH OK'"
@@ -182,8 +168,9 @@ jobs:
           # CRIAR DIRETÓRIOS WORDPRESS
           # ======================================================
 
-          ssh \
-            -S "$CONTROL_SOCKET" \
+          sshpass -e ssh \
+            -o ControlMaster=no \
+            -o ControlPath=none \
             -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
             "mkdir -p \
@@ -218,8 +205,9 @@ jobs:
               --timeout=600 \
               --info=progress2 \
               --stats \
-              -e "ssh \
-                -S $CONTROL_SOCKET \
+              -e "sshpass -e ssh \
+                -o ControlMaster=no \
+                -o ControlPath=none \
                 -p $SSH_PORT \
                 -o ServerAliveInterval=30 \
                 -o ServerAliveCountMax=10" \
