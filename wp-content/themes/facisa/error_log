@@ -1,0 +1,20 @@
+[29-Mar-2026 17:38:39 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function get_header() in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php:1
+Stack trace:
+#0 {main}
+  thrown in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php on line 1
+[17-Jul-2026 11:49:47 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function get_header() in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php:1
+Stack trace:
+#0 {main}
+  thrown in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php on line 1
+[13-Aug-2026 00:03:20 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function get_header() in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php:1
+Stack trace:
+#0 {main}
+  thrown in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php on line 1
+[23-Aug-2026 18:40:20 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function get_header() in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php:1
+Stack trace:
+#0 {main}
+  thrown in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php on line 1
+[26-Aug-2026 11:29:02 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function get_header() in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php:1
+Stack trace:
+#0 {main}
+  thrown in /home4/guiaun34/facisaunai.edu.br/wp-content/themes/facisa/index.php on line 1

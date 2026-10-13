@@ -1,0 +1,4 @@
+[24-Sep-2026 05:01:17 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function update_option() in /home4/guiaun34/facisaunai.edu.br/wp-content/plugins/gravityforms/gravityforms.php:31
+Stack trace:
+#0 {main}
+  thrown in /home4/guiaun34/facisaunai.edu.br/wp-content/plugins/gravityforms/gravityforms.php on line 31

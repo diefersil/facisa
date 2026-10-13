@@ -1,0 +1,421 @@
+@charset "UTF-8";
+
+/*
+Theme Name: Facisa 
+Theme URI: https://wordpress.org/themes/twentytwentyone/
+Author: Diego Fernandes
+Author URI: https://wordpress.org/
+Description: Facisa Theme
+Requires at least: 5.3
+Tested up to: 6.2
+Requires PHP: 5.6
+Version: 2024
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: facisa
+Tags: facisa
+*/
+
+/*Css Reset*/
+
+ h1,h2,h3,h4,h5,h6,span,p, ol, ul, form, input, select, textarea,label,.jet-filter-label,
+ .elementor-shortcode,.jet-tabs__content-wrapper,.jet-tabs__label-text,.jet-toggle__label-text,.jet-listing-dynamic-field__content,.jet-filters-pagination__link{
+  font-family: "Mulish", Sans-serif !important;
+}
+
+html {
+  box-sizing: border-box;
+  font-size: 16px;
+} 
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+body{
+    margin: 0;
+    padding: 0;
+}
+  
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+/*-------------------------------------------Header Menu Mapa----------------------------------------------*/
+
+.header-menu-mapa{
+  width: 15% !important
+}
+
+.header-menu-mapa .elementor-button{
+  display: block;
+  border:1px solid #193B5D;
+}
+
+.header-menu-mapa  .elementor-button:hover{
+  background:#052A4F !important;
+  border:1px solid lightgray;
+}
+
+.header-menu-mapa .elementor-button-text{
+  min-height: 30px !important;
+}
+
+.header-menu-mapa .fas {
+  font-size: 20px;
+}
+
+/*--------------------------------------------------------Title Pages----------------------------------*/
+
+.home .title-pages{
+  display: none;
+}
+
+.single-cursos .title-pages{
+  margin-bottom: 0 !important;
+}
+
+/*-------------------------------------------------Breadcrumbs---------------------------------------------*/
+
+.single-breadcrumb,.single-breadcrumb a,.single-breadcrumb span{
+  color: white !important;
+}
+
+/*-------------------------------------------------Home Cursos Tags---------------------------------------------*/
+
+  @media (max-width: 767px) {
+    .home .curso-tags {
+      justify-content: center !important;
+      padding-left:35px;
+   }
+  } 
+
+/*--------------------------------------Home Curso Tag Formação---------------------------------------------------*/
+
+/*.home .curso-tags-formacao{
+  display: none !important;
+}*/
+
+/*-------------------------------------------------------Home Mapa-------------------------------------------*/
+
+.home-mapa-item{
+  width: 15% !important
+}
+
+@media(max-width:799px){
+  .home-mapa-item{
+    width: calc(50% - 6px) !important;
+  }
+}
+
+.home-mapa-item .elementor-button{
+  min-height: 105px;
+  padding-top: 15px;
+}
+
+.home-mapa-item .elementor-button{
+  display: block;
+  border-radius: 10px;
+}
+
+.home-mapa-item  .elementor-button:hover{
+  background:#052A4F !important;
+}
+
+.home-mapa-item .elementor-button-content-wrapper{
+  flex-direction: column !important;
+}
+
+.home-mapa-item .elementor-button-icon{
+  margin-bottom: 5px;
+  display: inline !important;
+}
+
+.home-mapa-item i {
+  font-size: 30px;
+}
+
+.home-mapa-item .elementor-button-text{
+  min-height: 30px !important;
+  line-height: 18px
+}
+
+/*-----------------------------------Home Cursos---------------------------------------------------------*/
+
+/*.home .jet-tabs__control-wrapper {
+  display: none !important;
+}*/
+/*-----------------------------------Home Blog-----------------------------------------------------------*/
+
+@media(max-width:799px){
+  .home .jet-listing-grid__slider-icon {
+    color: white !important;
+    background: var( --e-global-color-primary ) !important;
+  }
+}
+
+/*-------------------------------------------------Contato------------------------------------------------*/
+
+  .contact-address .elementor-button-text{
+    text-align: left !important;
+  }
+
+  .contact-address .elementor-button-content-wrapper i{
+    margin-top: 3px !important;
+
+  }
+
+  /*------------------------------------------------Jet Engine-----------------------------------------------*/
+
+  .jet-mega-menu-mega-container__inner{
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .jet-tabs__control-wrapper,.jet-tabs__content-wrapper{
+    background: transparent !important;
+    width: 100% !important;
+  }
+
+  .active-tab .jet-tabs__label-text {
+    color: inherit !important;
+    background: lightgray;
+    background: #00264B;
+    color: white !important;
+  }
+
+  .jet-tabs__label-text{
+    padding:5px 7px;
+    border-radius: 10px;
+  }
+
+  .jet-tabs__label-text:hover{
+    background: lightgray;
+    background: #00264B;
+    color: white;
+  }
+
+  .jet-tabs__control {
+    flex: none !important;
+  }
+
+  .jet-tabs-position-top > .jet-tabs__control-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+/*.home .jet-tabs__control-wrapper{ /*Hide Jet tabs Home
+  display: none !important;
+}*/
+
+  .single-cursos .jet-tabs__control-wrapper {
+    justify-content: left !important;
+  }
+
+  .single-cursos .jet-tabs-position-top > .jet-tabs__control-wrapper {
+    margin-left: -10px !important;
+  }
+
+/*-------------------------------------------------Area do Aluno-------------------------------------------------------*/
+
+.page-id-1517 .jet-toggle__content-inner ul li{
+    margin-bottom: 10px !important;
+}
+
+.page-id-1517 .jet-toggle__content-inner {
+  padding: 0  20px 20px 20px !important;
+}
+
+/*Ocultar disciplinas online*/
+/*.page-id-1517 #moodle[aria-controls='jet-toggle-content-1692']{ 
+  display: none;
+}*/
+
+/*-----------------------------------------------------Quem Somos--------------------------------------------------------*/
+
+.page-id-1206 .elementor-318 .elementor-element.elementor-element-13806da8{
+  margin-top:0px important;
+}
+
+/*-----------------------------------------------Vestibular-----------------------------------------------------------*/
+
+.page-id-4375 .content-pusher{
+  padding-top: 0 !important
+}
+
+.page-id-4375 .header,.page-id-4375 .footer,.page-id-4375 .title-pages{
+  display: none !important;
+}
+
+.page-id-4375 .container {
+    width: 100%;
+    padding: 0;
+}
+
+.page-id-4375 .vest-titulo-curso{
+  min-height: 60px;
+}
+
+/*GForms*/
+
+.gform-body .charleft{
+  display: none !important;
+}
+
+.charleft.ginput_counter.gfield_description.warningTextareaInfo {
+  display: none !important;
+}
+
+.page-id-4375 .gform_validation_errors{
+  display: none !important;
+}
+
+.page-id-4375 .gfield_required{
+  display: none !important;
+}
+
+.page-id-4375 h2.gform_submission_error.hide_summary {
+  display: none;
+}
+
+.page-id-4375 form select{
+  border-radius: 10px;
+  padding: 8px
+}
+
+.page-id-4375 .warningTextareaInfo{
+  display: none;
+}
+
+/*--------------------------------------------Vestibular 2026------------------------------------------------*/
+
+.page-id-6542 .header, .page-id-6542 .footer, .page-id-6542 .elementor-827{
+    display:none !important;
+}
+
+.elementor-6542 .elementor-element.elementor-element-744ad90 .elementor-nav-menu--main .elementor-item:hover {
+  background-color: var( --e-global-color-primary );
+  color: white;
+  border-radius: 10px; 
+}
+
+.page-id-6542 .gform-field-label{
+      display: none !important;
+}
+
+.page-id-6542 input:focus::placeholder {
+    color: transparent;
+}
+
+/*--------------------------------------------Concurso de Bolsas 2026------------------------------------------------*/
+
+.page-id-7134 .header, .page-id-7134 .footer, .page-id-7134 .elementor-827{
+    display:none !important;
+}
+
+.elementor-7134 .elementor-element.elementor-element-744ad90 .elementor-nav-menu--main .elementor-item:hover {
+  background-color: var( --e-global-color-primary );
+  color: white;
+  border-radius: 10px; 
+}
+
+.page-id-7134 .gform-field-label{
+      display: none !important;
+}
+
+.page-id-7134 input:focus::placeholder {
+    color: transparent;
+}
+
+.page-id-7134 #form .charleft{
+  display: none !important;
+}
+
+
+/*-----------------------------------------Geral-----------------------------------------------------*/
+
+.listas ul{
+    margin: 0 20px 0 20px;
+    padding: 0;
+}
+
+.listas li{
+    list-style: none;
+    border: 1px solid var(--e-global-color-primary) ;
+    border-left: 4px solid var(--e-global-color-primary);
+    padding: 10px;
+    margin:0 0 15px 0
+}
+
+.listas li:hover{
+   background-color: lightgray;
+}
+
+.listas li a:hover{
+   text-decoration: underline;
+}
+
+
+/*---------------------------------------------------------Central de Atendimento-----------------------------------*/
+
+.page-id-901 .gfield_description{
+  display: none !important;
+}
+
+/*-----------------------------------------------------------Single Cursos------------------------------------------------*/
+
+.single-cursos #jet-tabs-control-2132{
+  display: none !important;
+}
+
+.single-cursos .jet-tabs__label-text{
+  padding:10px 12px;
+  border-radius: 5px;
+}
+
+.single-cursos  .jet-tabs__content {
+  line-height: 30px !important;
+}
+
+.single-cursos  .ginput_counter{
+  display: none !important;
+}
+
+.single-cursos .gform_validation_errors{
+  display: none !important;
+}
+
+.single-cursos .curso-url, .single-cursos .curso-nome{
+  visibility: hidden;
+  height: 1px;
+}
+
+/*----------------------------------------404-----------------------------------------*/
+
+.error404 .title-pages{
+  display: none !important;
+}
+
+
+/*-----------------------------------------Geral-----------------------------------------------------*/
+
+.listas ul{
+    margin: 0 20px 0 20px;
+    padding: 0;
+}
+
+.listas li{
+    list-style: none;
+    border: 1px solid var(--e-global-color-primary) ;
+    border-left: 4px solid var(--e-global-color-primary);
+    padding: 10px;
+    margin:0 0 15px 0
+}
+
+.listas li:hover{
+   background-color: lightgray;
+}
+
+.listas li a:hover{
+   text-decoration: underline;
+}

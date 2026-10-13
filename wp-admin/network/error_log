@@ -1,0 +1,22 @@
+[29-May-2026 04:16:12 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-sEP28F.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[29-May-2026 04:16:12 UTC] PHP Warning:  unlink(/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1239
+[29-May-2026 04:26:04 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-wb8sBf.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[29-May-2026 04:26:04 UTC] PHP Warning:  unlink(/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1239
+[17-Jun-2026 23:59:31 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-W9ArDa.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[17-Jun-2026 23:59:31 UTC] PHP Warning:  unlink(/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1239
+[22-Jun-2026 05:46:22 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-bp7naB.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[24-Jun-2026 10:00:34 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-5xKwmx.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[24-Jun-2026 10:02:00 UTC] PHP Warning:  unlink(/tmp/wordpress-seo.27.6.zip): No such file or directory in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/class-wp-upgrader.php on line 388
+[12-Jul-2026 06:15:12 UTC] PHP Warning:  unlink(/tmp/wordpress-seo.27.6.zip): No such file or directory in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/class-wp-upgrader.php on line 388
+[21-Jul-2026 11:56:10 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-VPCfi4.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[21-Jul-2026 12:54:39 UTC] PHP Warning:  unlink(/tmp/wordpress-seo.27.6.zip): No such file or directory in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/class-wp-upgrader.php on line 388
+[03-Aug-2026 07:21:17 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-eoPWB0.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[05-Aug-2026 00:03:34 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-TupLkn.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[05-Aug-2026 00:36:52 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-smxti8.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[11-Aug-2026 23:31:40 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-D09XMh.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[17-Aug-2026 06:07:25 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-y4upRE.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[20-Aug-2026 22:45:10 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-9R0rFT.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[24-Aug-2026 13:37:15 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-vs9wWP.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[24-Aug-2026 16:07:01 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-oc4PZm.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[25-Aug-2026 10:23:47 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-O01PmG.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234
+[07-Oct-2026 15:47:14 UTC] PHP Warning:  rename(/tmp/wordpress-seo.27.6-vXsvAj.tmp,/tmp/wordpress-seo.27.6.zip): Operation not permitted in /home4/guiaun34/facisaunai.edu.br/wp-admin/includes/file.php on line 1234

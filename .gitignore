@@ -1,0 +1,6 @@
+_trash/
+wp-config.php
+.git/
+wp-content/*
+!wp-content/plugins/
+!wp-content/themes/

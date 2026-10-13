@@ -1,0 +1,6 @@
+*** Yoast SEO premium Changelog ***
+
+
+2026-05-26 - version 27.6.1
+
+
