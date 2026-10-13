@@ -79,7 +79,7 @@ jobs:
             nome="${item#./}"
 
             case "$nome" in
-              wp-config.php|_trash|wp-content|.git)
+              wp-config.php|_trash|wp-content|.git|deploy-root|deploy-content)
                 continue
                 ;;
             esac
