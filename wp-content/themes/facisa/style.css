@@ -36,8 +36,8 @@ labe {
 
 /* Tipografia para textos do JetEngine; preserve as fontes dos ícones. */
 .jet-engine,
-.jet-engine :not(i):not(svg):not(svg *):not([class*="icon"]):not([class*="icon"] *),
-[class*="jet-"]:not(i):not(svg):not(svg *):not([class*="icon"]):not([class*="icon"] *) {
+.jet-engine :not(i):not(svg):not(svg *):not([class*="icon"]):not([class*="icon"] *):not(.fa):not(.fa *):not(.fas):not(.fas *):not(.far):not(.far *):not(.fab):not(.fab *),
+[class*="jet-"]:not(i):not(svg):not(svg *):not([class*="icon"]):not([class*="icon"] *):not(.fa):not(.fa *):not(.fas):not(.fas *):not(.far):not(.far *):not(.fab):not(.fab *) {
   font-family: "Mulish", sans-serif !important;
 }
 
