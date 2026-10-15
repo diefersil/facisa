@@ -30,16 +30,14 @@ form,
 input,
 select,
 textarea,
-label,
-.jet-filter-label,
-.elementor-shortcode,
-.jet-tabs__content-wrapper,
-.jet-tabs__label-text,
-.jet-toggle__label-text,
-.jet-listing-dynamic-field__content,
-.jet-filters-pagination__link,
-.jet-listing-dynamic-terms,
-.jet-listing {
+labe {
+  font-family: "Mulish", sans-serif !important;
+}
+
+/* Tipografia para textos do JetEngine; preserve as fontes dos ícones. */
+.jet-engine,
+.jet-engine :not(i):not(svg):not(svg *):not([class*="icon"]):not([class*="icon"] *),
+[class*="jet-"]:not(i):not(svg):not(svg *):not([class*="icon"]):not([class*="icon"] *) {
   font-family: "Mulish", sans-serif !important;
 }
 
@@ -360,9 +358,3 @@ img {
   height: 1px;
 }
 
-/* Tipografia padrao para todos os componentes do JetEngine */
-.jet-engine,
-.jet-engine *,
-[class*="jet-"] {
-  font-family: "Mulish", sans-serif !important;
-}
