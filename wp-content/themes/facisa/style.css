@@ -359,3 +359,10 @@ img {
   visibility: hidden;
   height: 1px;
 }
+
+/* Tipografia padrão para todos os componentes do JetEngine */
+.jet-engine,
+.jet-engine *,
+[class*="jet-] {
+  font-family: "Mulish", sans-serif !important;
+}
