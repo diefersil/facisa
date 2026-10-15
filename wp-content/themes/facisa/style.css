@@ -360,9 +360,9 @@ img {
   height: 1px;
 }
 
-/* Tipografia padrão para todos os componentes do JetEngine */
+/* Tipografia padrao para todos os componentes do JetEngine */
 .jet-engine,
 .jet-engine *,
-[class*="jet-] {
+[class*="jet-"] {
   font-family: "Mulish", sans-serif !important;
 }
